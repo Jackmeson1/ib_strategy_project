@@ -1,0 +1,12 @@
+symbol,weight,sector
+MSFT,0.15,Technology
+AAPL,0.08,Technology
+AVGO,0.12,Technology
+NVDA,0.12,Technology
+PLTR,0.03,Technology
+TSLA,0.04,Consumer Discretionary
+GLD,0.12,Commodities
+RNMBY,0.10,Industrials
+SAABY,0.12,Industrials
+XLV,0.08,Healthcare
+ORCL,0.04,Technology 

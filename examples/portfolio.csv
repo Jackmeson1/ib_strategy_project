@@ -1,0 +1,20 @@
+symbol,weight,sector
+MSFT,0.13,Technology
+AAPL,0.05,Technology
+AVGO,0.09,Technology
+NVDA,0.10,Technology
+PLTR,0.03,Technology
+TSLA,0.02,Consumer Discretionary
+TSM,0.05,Technology
+MRVL,0.04,Technology
+ASML,0.02,Technology
+MU,0.02,Technology
+RNMBY,0.06,Industrials
+SAABY,0.07,Industrials
+ITA,0.07,ETF
+ETN,0.01,Industrials
+GLD,0.10,Commodities
+SLV,0.02,Commodities
+ORCL,0.05,Technology
+VRT,0.02,Technology
+XLP,0.05,ETF 

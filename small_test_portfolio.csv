@@ -1,0 +1,7 @@
+symbol,weight,sector
+MSFT,0.25,Technology
+AAPL,0.15,Technology
+NVDA,0.20,Technology
+GLD,0.20,Commodities
+TSLA,0.10,Consumer Discretionary
+PLTR,0.10,Technology 

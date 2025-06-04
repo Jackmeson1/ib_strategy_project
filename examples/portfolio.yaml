@@ -1,0 +1,72 @@
+# Example portfolio configuration
+# Weights must sum to 1.0
+
+portfolio:
+  # Core Technology & AI Infrastructure (39%)
+  MSFT:
+    weight: 0.13
+    sector: Technology
+  AAPL:
+    weight: 0.05
+    sector: Technology
+  AVGO:
+    weight: 0.09
+    sector: Technology
+  NVDA:
+    weight: 0.10
+    sector: Technology
+  PLTR:
+    weight: 0.03
+    sector: Technology
+    
+  # Manufacturing, EV & Advanced Processes (15%)
+  TSLA:
+    weight: 0.02
+    sector: Consumer Discretionary
+  TSM:
+    weight: 0.05
+    sector: Technology
+  MRVL:
+    weight: 0.04
+    sector: Technology
+  ASML:
+    weight: 0.02
+    sector: Technology
+  MU:
+    weight: 0.02
+    sector: Technology
+    
+  # Defense & Military (13%)
+  RNMBY:
+    weight: 0.06
+    sector: Industrials
+  SAABY:
+    weight: 0.07
+    sector: Industrials
+    
+  # Defense ETF & Industrial Base (8%)
+  ITA:
+    weight: 0.07
+    sector: ETF
+  ETN:
+    weight: 0.01
+    sector: Industrials
+    
+  # Gold & Silver (12%)
+  GLD:
+    weight: 0.10
+    sector: Commodities
+  SLV:
+    weight: 0.02
+    sector: Commodities
+    
+  # AI Applications/Data & Enterprise Software (13%)
+  ORCL:
+    weight: 0.05
+    sector: Technology
+  VRT:
+    weight: 0.02
+    sector: Technology
+  XLP:
+    weight: 0.05
+    sector: ETF 

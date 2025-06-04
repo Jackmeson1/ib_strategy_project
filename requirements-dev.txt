@@ -1,0 +1,26 @@
+# Include base requirements
+-r requirements.txt
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Type checking
+mypy==1.7.1
+types-requests==2.31.0
+pandas-stubs==2.1.1.230928
+
+# Code quality
+ruff==0.1.6
+black==23.11.0
+isort==5.12.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.4.14
+mkdocstrings[python]==0.24.0
+
+# Pre-commit hooks
+pre-commit==3.5.0 
