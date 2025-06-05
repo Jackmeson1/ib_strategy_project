@@ -7,7 +7,6 @@ The IB Portfolio Rebalancing Tool has been successfully simplified and tested. H
 ### Changes Made:
 1. ✅ Removed VIX-based dynamic leverage logic
 2. ✅ Removed Claude AI integration
-3. ✅ Created new `rebalance.py` script for manual rebalancing
 4. ✅ Added support for CSV/YAML portfolio files
 5. ✅ Fixed bugs in portfolio weights (PLTR: 0.02 → 0.03)
 6. ✅ Fixed logger configuration issues
@@ -34,33 +33,33 @@ cp .env.example .env
 
 ### 2. Check your portfolio status:
 ```bash
-python rebalance.py --status
+python main.py --status
 ```
 
 ### 3. Test rebalancing (dry run):
 ```bash
-python rebalance.py --dry-run
+python main.py --dry-run
 ```
 
 ### 4. Execute rebalancing:
 ```bash
 # With confirmation prompt
-python rebalance.py
+python main.py
 
 # Skip confirmation
-python rebalance.py --force
+python main.py --force
 ```
 
 ### 5. Use custom portfolio weights:
 ```bash
 # From CSV file
-python rebalance.py --portfolio examples/portfolio.csv
+python main.py --portfolio examples/portfolio.csv
 
 # From YAML file
-python rebalance.py --portfolio examples/portfolio.yaml
+python main.py --portfolio examples/portfolio.yaml
 
 # With custom leverage
-python rebalance.py --leverage 1.5
+python main.py --leverage 1.5
 ```
 
 ## Portfolio Weights

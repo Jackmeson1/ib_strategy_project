@@ -6,10 +6,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from src.core.types import MAType, VIXData
+from src.core.types import MAType
 from src.data.indicators import (
     SimpleMovingAverage, ExponentialMovingAverage,
-    HullMovingAverage, VIXIndicator, IndicatorFactory
+    HullMovingAverage, IndicatorFactory
 )
 
 
@@ -86,73 +86,3 @@ class TestIndicatorFactory:
             IndicatorFactory.create_moving_average("INVALID", 10)
 
 
-class TestVIXIndicator:
-    """Test VIX indicator calculations."""
-    
-    @pytest.fixture
-    def vix_data(self):
-        """Create sample VIX data."""
-        dates = pd.date_range(start='2023-01-01', periods=30, freq='D')
-        # Simulate VIX values oscillating between 12 and 25
-        vix_values = 18.5 + 6.5 * np.sin(np.linspace(0, 4*np.pi, 30))
-        df = pd.DataFrame({
-            'date': dates,
-            'close': vix_values
-        })
-        return df
-    
-    def test_vix_ma_calculation(self, vix_data):
-        """Test VIX MA calculation."""
-        indicator = VIXIndicator(ma_type="SMA", ma_window=10)
-        result = indicator.calculate_vix_ma(vix_data)
-        
-        assert isinstance(result, VIXData)
-        assert result.ma_type == MAType.SMA
-        assert result.ma_window == 10
-        assert result.date == vix_data['date'].iloc[-1]
-        assert result.close == vix_data['close'].iloc[-1]
-        assert isinstance(result.ma_value, float)
-    
-    def test_vix_ma_insufficient_data(self):
-        """Test VIX MA with insufficient data."""
-        # Create data with only 5 points
-        dates = pd.date_range(start='2023-01-01', periods=5, freq='D')
-        df = pd.DataFrame({
-            'date': dates,
-            'close': [15, 16, 14, 15, 17]
-        })
-        
-        indicator = VIXIndicator(ma_type="SMA", ma_window=10)
-        result = indicator.calculate_vix_ma(df)
-        
-        assert result is None  # Should return None for insufficient data
-    
-    def test_vix_percentile(self, vix_data):
-        """Test VIX percentile calculation."""
-        indicator = VIXIndicator()
-        percentile = indicator.calculate_vix_percentile(vix_data, lookback_days=20)
-        
-        assert 0 <= percentile <= 100
-        
-        # Test with current value at max
-        vix_data_copy = vix_data.copy()
-        vix_data_copy.loc[vix_data_copy.index[-1], 'close'] = 100
-        percentile_max = indicator.calculate_vix_percentile(vix_data_copy, lookback_days=20)
-        assert percentile_max > 90  # Should be near 100th percentile
-    
-    def test_vix_zscore(self, vix_data):
-        """Test VIX z-score calculation."""
-        indicator = VIXIndicator()
-        zscore = indicator.calculate_vix_zscore(vix_data, lookback_days=20)
-        
-        # Z-score should typically be between -3 and 3
-        assert -4 < zscore < 4
-        
-        # Test with extreme value
-        vix_data_copy = vix_data.copy()
-        mean = vix_data_copy['close'].tail(20).mean()
-        std = vix_data_copy['close'].tail(20).std()
-        vix_data_copy.loc[vix_data_copy.index[-1], 'close'] = mean + 2 * std
-        
-        zscore_high = indicator.calculate_vix_zscore(vix_data_copy, lookback_days=20)
-        assert zscore_high > 1.5  # Should be significantly positive 

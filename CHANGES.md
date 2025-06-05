@@ -111,9 +111,9 @@ python rebalance.py --leverage 1.4
 python rebalance.py --portfolio my_weights.csv
 ```
 
-## Notes
+-## Notes
 
-- The old VIX strategy code remains in `src/strategy/vix_leverage.py` and `main.py` for backward compatibility
-- `demo.py` is kept as a reference implementation but is not part of the main workflow
+- Removed deprecated VIX strategy code
+- `demo.py` and debug scripts were removed to reduce clutter
 - Portfolio snapshots are now saved automatically after each rebalancing
-- The project structure remains modular for easy extension or modification 
+- The project structure remains modular for easy extension or modification

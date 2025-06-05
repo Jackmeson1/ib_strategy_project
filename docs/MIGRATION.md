@@ -152,19 +152,14 @@ A: The new strategy is designed for monthly/quarterly rebalancing based on your 
 A: VIX-based adjustments are removed. You now have full control over leverage settings.
 
 ### Q: Can I still use the old VIX strategy?
-A: Yes, the VIX strategy code is still available in `src/strategy/vix_leverage.py` and can be used via `main.py`, but it's no longer actively maintained.
+A: The VIX-based implementation has been removed in this version. Use the fixed leverage approach instead.
 
 ### Q: How do I schedule rebalancing?
 A: You can use cron (Linux/Mac) or Task Scheduler (Windows) to run `python rebalance.py` periodically, but manual execution is recommended.
 
 ## Rollback
 
-If you need to rollback to the VIX strategy:
-
-1. The old code is still available in `main.py` and `src/strategy/vix_leverage.py`
-2. Restore your old `.env` configuration
-3. Install anthropic: `pip install anthropic==0.34.0`
-4. Run `python main.py` as before
+If you need the previous VIX-based implementation you will need to restore it from version control history.
 
 ## Support
 
