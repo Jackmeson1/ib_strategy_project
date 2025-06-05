@@ -4,13 +4,13 @@ Market data management with caching and error handling.
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import pandas as pd
-from ib_insync import IB, Contract, Forex, Index, Stock, MarketOrder
+from ib_insync import IB, Contract, Forex, Stock, MarketOrder
 
 from src.core.exceptions import MarketDataError, TemporaryError
-from src.core.types import MarketData, VIXData, MAType
+from src.core.types import MarketData
 from src.utils.logger import get_logger
 
 
@@ -103,54 +103,6 @@ class MarketDataManager:
         except Exception as e:
             self.logger.error(f"Failed to get FX rate: {e}")
             raise MarketDataError(f"Failed to get FX rate: {e}")
-    
-    def get_vix_data(self, days: int = 30) -> Optional[pd.DataFrame]:
-        """
-        Get historical VIX data.
-        
-        Args:
-            days: Number of days of historical data
-            
-        Returns:
-            DataFrame with date and close columns, or None if unavailable
-            
-        Raises:
-            MarketDataError: If unable to get VIX data
-        """
-        cache_key = f"vix_data_{days}"
-        cached = self._get_from_cache(cache_key)
-        if cached is not None:
-            return cached
-        
-        try:
-            vix_contract = Index('VIX', 'CBOE', 'USD')
-            self.ib.qualifyContracts(vix_contract)
-            
-            bars = self.ib.reqHistoricalData(
-                vix_contract,
-                endDateTime='',
-                durationStr=f'{days} D',
-                barSizeSetting='1 day',
-                whatToShow='TRADES',
-                useRTH=True
-            )
-            
-            if not bars:
-                self.logger.warning("No VIX data returned - market may be closed or holiday")
-                return None
-            
-            df = pd.DataFrame({
-                'date': [bar.date for bar in bars],
-                'close': [bar.close for bar in bars]
-            })
-            
-            self._set_cache(cache_key, df)
-            self.logger.info(f"Retrieved {len(df)} days of VIX data")
-            return df
-            
-        except Exception as e:
-            self.logger.error(f"Failed to get VIX data: {e}")
-            raise MarketDataError(f"Failed to get VIX data: {e}")
     
     def get_market_price(self, contract: Contract, timeout: int = 10) -> float:
         """

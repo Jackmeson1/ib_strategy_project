@@ -129,22 +129,10 @@ class MarketData:
 
 
 @dataclass
-class VIXData:
-    """VIX data with calculated indicators."""
-    date: datetime
-    close: float
-    ma_value: float
-    ma_type: MAType
-    ma_window: int
-
-
-@dataclass
 class LeverageState:
     """Current leverage state."""
     current_leverage: float
     target_leverage: float
-    vix_level: float
-    vix_ma: float
     requires_rebalance: bool
     margin_safe: bool
 

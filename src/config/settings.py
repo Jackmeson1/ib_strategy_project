@@ -44,16 +44,6 @@ class StrategyConfig:
     rebalance_tolerance: float = field(default_factory=lambda: float(os.getenv("REBALANCE_TOLERANCE", "0.05")))
     safety_threshold: float = field(default_factory=lambda: float(os.getenv("SAFETY_THRESHOLD", "0.15")))  # 15% safety buffer
     
-    # Legacy VIX settings (kept for compatibility with existing code)
-    vix_ma_window: int = 10
-    vix_ma_type: str = "SMA"
-    vix_threshold_low: float = 15
-    vix_threshold_mid: float = 20
-    vix_threshold_high: float = 25
-    leverage_vix_low: float = 2.0
-    leverage_vix_mid: float = 1.6
-    leverage_vix_high: float = 1.2
-    leverage_vix_extreme: float = 0.8
 
 
 @dataclass
