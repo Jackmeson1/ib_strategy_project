@@ -41,6 +41,8 @@ This project has been simplified from a VIX-based dynamic leverage strategy to a
 
 6. **`src/strategy/__init__.py`**
    - Added imports for `FixedLeverageStrategy`
+7. **`src/data/indicators.py`**
+   - Removed leftover VIX calculation line
 
 ## Key Changes
 

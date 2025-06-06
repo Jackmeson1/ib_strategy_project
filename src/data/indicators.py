@@ -127,6 +127,3 @@ class IndicatorFactory:
             return HullMovingAverage(window)
         else:
             raise ValueError(f"Unsupported moving average type: {ma_type}")
-
-
-        return (current_vix - mean) / std 

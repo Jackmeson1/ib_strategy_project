@@ -84,7 +84,7 @@ Total weights now correctly sum to 1.0.
 - No more VIX monitoring or dynamic adjustments
 - Designed for monthly/quarterly rebalancing
 - All trades are executed in 3 random batches
-- Portfolio snapshots saved to `portfolio_snapshots/`
+ - Portfolio snapshots saved to `portfolio_snapshots/` (gitignored)
 
 ## Troubleshooting
 
