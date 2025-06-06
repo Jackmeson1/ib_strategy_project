@@ -1,6 +1,10 @@
 """
-Smart Order Executor with enhanced order management, margin control, and retry logic.
-Addresses production-level issues with market orders, sequential execution, and partial fills.
+Smart Order Executor with enhanced order management, margin control and retry
+logic.
+
+This executor runs orders in prioritized batches. Each batch executes
+concurrently using a small thread pool to avoid hanging while containing risk.
+For full fire-all-then-monitor behaviour see :class:`BatchOrderExecutor`.
 """
 import signal
 import threading
@@ -71,9 +75,12 @@ class MarginCheck:
 
 class SmartOrderExecutor(BaseExecutor):
     """
-    Production-ready order executor with:
+    Production-ready executor using parallel batches and retry logic.
+
+    Features
+    -------
     - Smart order types (Limit, Market, Stop)
-    - Parallel execution within batches
+    - Parallel execution of each batch using ``ThreadPoolExecutor``
     - Retry logic for partial fills
     - Margin control and safety checks
     - Position sizing based on available funds
