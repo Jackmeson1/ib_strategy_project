@@ -234,8 +234,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Execution Modes:
-  Standard (default): Sequential order processing, market orders, basic safety
-  Batch: Parallel order processing, smart order types, enhanced safety
+  Standard (default)          : Sequential three-batch processing
+  Smart (--smart-orders etc.) : Parallel batches via SmartOrderExecutor
+  Batch (--batch-execution)   : Fire-all then monitor with thread pools
 
 Key Features:
   --batch-execution    : Process all orders in parallel (faster, production-grade)
