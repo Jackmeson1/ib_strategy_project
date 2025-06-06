@@ -31,6 +31,9 @@ cp .env.example .env
 # - IB_GATEWAY_PORT=7497 (for TWS paper)
 ```
 
+Need a different file? Use `python main.py --env-file prod.env` or
+`docker run --env-file prod.env ...`.
+
 ### 2. Check your portfolio status:
 ```bash
 python main.py --status
@@ -95,4 +98,4 @@ If you see "IB_ACCOUNT_ID environment variable is required":
 3. Run with `--dry-run` first to preview changes
 4. Execute actual rebalancing when ready
 
-The simplified tool is now ready for use! 🎉 
+The simplified tool is now ready for use! 🎉

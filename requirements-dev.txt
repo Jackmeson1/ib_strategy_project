@@ -1,5 +1,6 @@
 # Include base requirements
 -r requirements.txt
+keyring>=24.3.0
 
 # Testing
 pytest==7.4.3
@@ -23,4 +24,4 @@ mkdocs-material==9.4.14
 mkdocstrings[python]==0.24.0
 
 # Pre-commit hooks
-pre-commit==3.5.0 
+pre-commit==3.5.0
