@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 
-from ib_insync import IB, Contract, MarketOrder, LimitOrder, Trade as IBTrade, util
+from ib_insync import IB, Contract, MarketOrder, LimitOrder, Trade as IBTrade
 
 from src.config.settings import Config
 from src.core.exceptions import OrderExecutionError, RetryableError
@@ -17,10 +17,10 @@ from src.core.types import (
     ExecutionResult, Order, OrderAction, OrderStatus, Trade
 )
 from src.portfolio.manager import PortfolioManager
-from src.utils.logger import get_logger
+from .base_executor import BaseExecutor
 
 
-class BatchOrderExecutor:
+class BatchOrderExecutor(BaseExecutor):
     """
     Enhanced batch order executor with true parallel execution.
     
@@ -41,13 +41,9 @@ class BatchOrderExecutor:
         max_parallel_orders: int = 5,
         margin_cushion: float = 0.2
     ):
-        self.ib = ib
-        self.portfolio_manager = portfolio_manager
-        self.config = config
-        self.contracts = contracts
+        super().__init__(ib, portfolio_manager, config, contracts)
         self.max_parallel_orders = max_parallel_orders
         self.margin_cushion = margin_cushion
-        self.logger = get_logger(__name__)
         
         # Execution parameters
         self.order_timeout = 300  # 5 minutes per order
@@ -377,16 +373,18 @@ class BatchOrderExecutor:
             for _ in range(5):
                 if trade.isDone():
                     self.logger.info(f"⚡ Immediate fill detected for {symbol}")
+
                     return self._validate_fill(trade)
                 # Keep event loop alive during quick checks
                 self.ib.sleep(0.1)
+
             
             # Regular monitoring loop
             while time.time() - start_time < self.order_timeout and self._monitor_active:
                 try:
                     # Check if order is done
                     if trade.isDone():
-                        return self._validate_fill(trade)
+                        return self._validate_fill(trade, self.min_fill_ratio)
                     
                     # Check for partial fills
                     if trade.orderStatus.filled > 0:
@@ -431,42 +429,6 @@ class BatchOrderExecutor:
             self.logger.error(f"Order monitoring failed for {symbol}: {e}", exc_info=True)
             return False
     
-    def _validate_fill(self, trade: IBTrade) -> bool:
-        """
-        Validate that an order fill is acceptable.
-        
-        Args:
-            trade: IBTrade object to validate
-            
-        Returns:
-            True if fill is valid, False otherwise
-        """
-        try:
-            if trade.orderStatus.status in ['Filled', 'PartiallyFilled']:
-                filled_qty = trade.orderStatus.filled
-                total_qty = trade.order.totalQuantity
-                fill_ratio = filled_qty / total_qty
-                
-                if fill_ratio >= self.min_fill_ratio:
-                    avg_price = trade.orderStatus.avgFillPrice
-                    symbol = trade.contract.symbol
-                    
-                    self.logger.info(
-                        f"✅ Valid fill for {symbol}: {filled_qty}/{total_qty} shares @ ${avg_price:.2f}"
-                    )
-                    return True
-                else:
-                    self.logger.warning(
-                        f"⚠️  Insufficient fill for {trade.contract.symbol}: {fill_ratio:.1%} < {self.min_fill_ratio:.1%}"
-                    )
-                    return False
-            else:
-                self.logger.warning(f"⚠️  Invalid status for {trade.contract.symbol}: {trade.orderStatus.status}")
-                return False
-        
-        except Exception as e:
-            self.logger.error(f"Fill validation failed: {e}")
-            return False
     
     def _compile_results(self, original_orders: List[Order], start_time: float, success: bool) -> ExecutionResult:
         """

@@ -17,7 +17,7 @@ from ib_insync import Trade as IBTrade
 from src.config.settings import Config
 from src.core.types import ExecutionResult, Order, OrderAction, OrderStatus, RebalanceRequest, Trade
 from src.portfolio.manager import PortfolioManager
-from src.utils.logger import get_logger
+from .base_executor import BaseExecutor
 
 
 class OrderType(Enum):
@@ -69,7 +69,7 @@ class MarginCheck:
     warning_message: Optional[str] = None
 
 
-class SmartOrderExecutor:
+class SmartOrderExecutor(BaseExecutor):
     """
     Production-ready order executor with:
     - Smart order types (Limit, Market, Stop)
@@ -86,11 +86,9 @@ class SmartOrderExecutor:
         config: Config,
         contracts: Dict[str, Contract]
     ):
-        self.ib = ib
-        self.portfolio_manager = portfolio_manager
-        self.config = config
-        self.contracts = contracts
-        self.logger = get_logger(__name__)
+
+        super().__init__(ib, portfolio_manager, config, contracts)
+        
 
         # Execution parameters
         self.max_parallel_orders = 3  # Conservative parallel execution
@@ -816,6 +814,7 @@ class SmartOrderExecutor:
             status=OrderStatus.PARTIALLY_FILLED
         )
 
+
     def _create_trade_from_ib(self, ib_trade: IBTrade) -> Trade:
         """Create trade object from completed IB trade - enhanced error handling."""
         try:
@@ -881,3 +880,4 @@ class SmartOrderExecutor:
                 timestamp=datetime.now(),
                 status=OrderStatus.FILLED
             )
+
