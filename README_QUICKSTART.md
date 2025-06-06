@@ -28,6 +28,8 @@ cp .env.example .env
 # Edit with your settings
 # Make sure to set:
 # - IB_ACCOUNT_ID=DU7793356 (or your account)
+#   # or use IB_ACCOUNTS for multiple accounts
+#   # IB_ACCOUNTS=DU1234567:CAD,DU7654321:USD
 # - IB_GATEWAY_PORT=7497 (for TWS paper)
 ```
 

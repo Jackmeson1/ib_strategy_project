@@ -4,7 +4,7 @@ All sensitive information should be loaded from environment variables.
 """
 import os
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 
 
@@ -14,11 +14,11 @@ class IBConfig:
     host: str = field(default_factory=lambda: os.getenv("IB_GATEWAY_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(os.getenv("IB_GATEWAY_PORT", "4002")))
     client_id: int = field(default_factory=lambda: int(os.getenv("IB_CLIENT_ID", "1")))
-    account_id: str = field(default_factory=lambda: os.getenv("IB_ACCOUNT_ID", ""))
-    
+    account_id: Optional[str] = field(default_factory=lambda: os.getenv("IB_ACCOUNT_ID"))
+
     def __post_init__(self):
-        if not self.account_id:
-            raise ValueError("IB_ACCOUNT_ID environment variable is required")
+        # account_id may be None when using multi-account mode
+        pass
 
 
 @dataclass
@@ -59,12 +59,20 @@ class LoggingConfig:
 
 
 @dataclass
+class AccountConfig:
+    """Individual account configuration."""
+    account_id: str
+    base_currency: str = "USD"
+
+
+@dataclass
 class Config:
     """Main configuration container."""
     ib: IBConfig = field(default_factory=IBConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    accounts: List[AccountConfig] = field(default_factory=list)
     
     # Runtime configuration
     dry_run: bool = field(default_factory=lambda: os.getenv("DRY_RUN", "false").lower() == "true")
@@ -76,7 +84,32 @@ class Config:
 
 def load_config() -> Config:
     """Load configuration from environment variables."""
-    return Config()
+    config = Config()
+    accounts_env = os.getenv("IB_ACCOUNTS")
+    accounts: List[AccountConfig] = []
+
+    if accounts_env:
+        parts = [p.strip() for p in accounts_env.split(',') if p.strip()]
+        for part in parts:
+            if ':' in part:
+                acc_id, curr = part.split(':', 1)
+                accounts.append(AccountConfig(acc_id.strip(), curr.strip().upper()))
+            else:
+                accounts.append(AccountConfig(part.strip(), os.getenv("IB_BASE_CURRENCY", "USD").upper()))
+    else:
+        account_id = os.getenv("IB_ACCOUNT_ID")
+        if account_id:
+            base = os.getenv("IB_BASE_CURRENCY", "USD").upper()
+            accounts.append(AccountConfig(account_id, base))
+
+    if not accounts:
+        raise ValueError("No IB account configured. Set IB_ACCOUNT_ID or IB_ACCOUNTS")
+
+    config.accounts = accounts
+    if not config.ib.account_id:
+        config.ib.account_id = accounts[0].account_id
+
+    return config
 
 
 # Example environment template
@@ -84,7 +117,10 @@ ENV_TEMPLATE = """# Interactive Brokers Configuration
 IB_GATEWAY_HOST=127.0.0.1
 IB_GATEWAY_PORT=4002  # Use 7497 for TWS paper, 7496 for TWS live
 IB_CLIENT_ID=1
+# Single account
 IB_ACCOUNT_ID=YOUR_ACCOUNT_ID
+# Or multiple accounts with base currencies
+# IB_ACCOUNTS=DU1234567:CAD,DU7654321:USD
 
 # Strategy Settings
 DEFAULT_LEVERAGE=1.4              # Target leverage for portfolio

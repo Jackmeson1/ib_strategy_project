@@ -73,6 +73,8 @@ IB_GATEWAY_HOST=127.0.0.1
 IB_GATEWAY_PORT=7497  # Paper: 7497, Live: 7496
 IB_ACCOUNT_ID=DU1234567
 IB_CLIENT_ID=1
+# Or multiple accounts with base currencies
+# IB_ACCOUNTS=DU1234567:CAD,DU7654321:USD
 
 # Strategy Settings
 TARGET_LEVERAGE=1.4
@@ -86,6 +88,18 @@ DRY_RUN=true  # Set to false for live trading
 ```
 
 **⚠️ Security**: Never commit your `.env` file! Keep credentials secure.
+
+### Multi-Account Setup
+
+Define multiple accounts in `IB_ACCOUNTS` separated by commas. Each entry is
+`ACCOUNT_ID:BASE_CURRENCY`:
+
+```env
+IB_ACCOUNTS=DU1234567:CAD,DU7654321:USD
+```
+
+The first account is used by default for connection if `IB_ACCOUNT_ID` is not
+set.
 
 ## Usage
 
