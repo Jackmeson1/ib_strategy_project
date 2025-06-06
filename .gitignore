@@ -170,4 +170,5 @@ tws.log
 # Trading data
 positions_*.csv
 trades_*.csv
-backtest_results/ 
+backtest_results/
+portfolio_snapshots/

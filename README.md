@@ -65,6 +65,15 @@ cp config/env.example .env
 
 To load a different file, pass `--env-file my.env` (or use `docker run --env-file my.env`).
 
+### Windows Batch Example
+Create a simple batch script for quick setup and execution:
+
+```bat
+@echo off
+call venv\Scripts\activate.bat
+python main.py --batch-execution
+```
+
 ## Configuration
 
 Create `.env` file from template (see `config/env.example`):
@@ -221,7 +230,8 @@ python main.py --verbose --batch-execution --dry-run
 ## Monitoring & Alerts
 
 ### Portfolio Snapshots
-After each rebalancing, JSON snapshots saved to `portfolio_snapshots/`:
+After each rebalancing, JSON snapshots are saved to `portfolio_snapshots/` (the
+folder is gitignored to keep account details private):
 ```json
 {
   "timestamp": "2024-01-15T14:30:00",
@@ -317,6 +327,16 @@ python main.py --batch-execution --smart-orders --hanging-protection --atomic-ma
 - Keep backups of working configurations
 - Monitor first live runs manually
 - Understand that leverage amplifies both gains and losses
+
+## Troubleshooting FAQ
+
+**Orders fail to submit**
+  - Ensure your IB Gateway or TWS is running and API access is enabled.
+  - Check that `IB_ACCOUNT_ID` and `IB_GATEWAY_PORT` in `.env` match your setup.
+
+**Environment variables not loading**
+  - Confirm you are in the project root when running the script.
+  - Use `--env-file path/to/file.env` to specify a custom file.
 
 ## License
 

@@ -166,4 +166,4 @@ If you need the previous VIX-based implementation you will need to restore it fr
 For issues or questions:
 1. Check the logs in `logs/` directory
 2. Run with `--dry-run` to test changes
-3. Review position snapshots in `portfolio_snapshots/` 
+3. Review position snapshots in `portfolio_snapshots/` (folder is gitignored)
