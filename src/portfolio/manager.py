@@ -21,6 +21,7 @@ from src.core.types import (
 from src.data.market_data import MarketDataManager
 from src.utils.logger import get_logger
 from src.utils.delay import wait
+from src.utils.currency import convert
 
 
 class PortfolioManager:
@@ -38,12 +39,21 @@ class PortfolioManager:
         self.config = config
         self.contracts = contracts
         self.logger = get_logger(__name__)
+        self.accounts = config.accounts or []
+        if not self.accounts and config.ib.account_id:
+            from src.config.settings import AccountConfig
+            self.accounts = [AccountConfig(config.ib.account_id, "USD")]
+        self._currency_map = {acc.account_id: acc.base_currency.upper() for acc in self.accounts}
         
         # Cache for account and position data
         self._account_cache: Optional[AccountSummaryDict] = None
         self._positions_cache: Dict[str, Position] = {}
         self._cache_timestamp: Optional[datetime] = None
         self._cache_ttl_seconds = 60  # 1 minute cache
+
+    def _to_usd(self, amount: float, currency: str) -> float:
+        """Convert the given amount to USD."""
+        return convert(amount, currency, "USD", self.market_data)
     
     def _is_cache_valid(self) -> bool:
         """Check if cache is still valid."""
@@ -78,10 +88,10 @@ class PortfolioManager:
             
             # Use portfolio() method instead of positions() for better data
             portfolio_items = self.ib.portfolio()
-            
-            positions = {}
+
+            positions: Dict[str, Position] = {}
             for item in portfolio_items:
-                if item.position != 0 and item.account == self.config.ib.account_id:
+                if item.position != 0 and item.account in self._currency_map:
                     # Use the market value from portfolio item if available
                     market_value = getattr(item, 'marketValue', None)
                     unrealized_pnl = getattr(item, 'unrealizedPNL', None)
@@ -97,14 +107,23 @@ class PortfolioManager:
                         market_value = current_price * item.position
                         unrealized_pnl = 0.0
                     
-                    position = Position(
-                        symbol=item.contract.symbol,
-                        quantity=item.position,
-                        avg_cost=item.averageCost,
-                        current_price=current_price,
-                        unrealized_pnl=unrealized_pnl
-                    )
-                    positions[position.symbol] = position
+                    symbol = item.contract.symbol
+                    if symbol not in positions:
+                        positions[symbol] = Position(
+                            symbol=symbol,
+                            quantity=item.position,
+                            avg_cost=item.averageCost,
+                            current_price=current_price,
+                            unrealized_pnl=unrealized_pnl,
+                        )
+                    else:
+                        pos = positions[symbol]
+                        total_qty = pos.quantity + item.position
+                        if total_qty != 0:
+                            pos.avg_cost = (
+                                pos.avg_cost * pos.quantity + item.averageCost * item.position
+                            ) / total_qty
+                        pos.quantity = total_qty
             
             # Update cache
             self._positions_cache = positions
@@ -139,39 +158,47 @@ class PortfolioManager:
         
         try:
             self.logger.info("Fetching account summary from IB")
-            account_items = self.ib.accountSummary(account=self.config.ib.account_id)
-            
-            summary: AccountSummaryDict = {}
+            aggregate: AccountSummaryDict = {}
             key_fields = [
                 'NetLiquidation', 'GrossPositionValue', 'AvailableFunds',
                 'MaintMarginReq', 'InitMarginReq', 'BuyingPower', 'EquityWithLoanValue'
             ]
-            
-            for item in account_items:
-                if item.tag in key_fields:
-                    try:
-                        summary[item.tag] = float(item.value)
-                    except (ValueError, TypeError):
-                        self.logger.warning(f"Cannot parse {item.tag}: {item.value}")
-                        summary[item.tag] = 0.0
-            
+
+            for acc in self.accounts:
+                account_items = self.ib.accountSummary(account=acc.account_id)
+                account_summary: AccountSummaryDict = {}
+
+                for item in account_items:
+                    if item.tag in key_fields:
+                        try:
+                            account_summary[item.tag] = float(item.value)
+                        except (ValueError, TypeError):
+                            self.logger.warning(f"Cannot parse {item.tag}: {item.value}")
+                            account_summary[item.tag] = 0.0
+
+                for field in key_fields:
+                    value = account_summary.get(field, 0.0)
+                    if field not in aggregate:
+                        aggregate[field] = 0.0
+                    aggregate[field] += self._to_usd(value, self._currency_map[acc.account_id])
+
             # Validate critical fields
-            if summary.get('NetLiquidation', 0) <= 0:
+            if aggregate.get('NetLiquidation', 0) <= 0:
                 raise DataIntegrityError("Invalid Net Liquidation Value")
-            
+
             # Update cache
-            self._account_cache = summary
+            self._account_cache = aggregate
             self._cache_timestamp = datetime.now()
-            
+
             # Log sanitized summary
             self.logger.info(
                 "Account summary retrieved",
-                net_liquidation=f"${summary.get('NetLiquidation', 0):,.0f}",
-                available_funds=f"${summary.get('AvailableFunds', 0):,.0f}",
-                margin_used=f"${summary.get('MaintMarginReq', 0):,.0f}"
+                net_liquidation=f"${aggregate.get('NetLiquidation', 0):,.0f}",
+                available_funds=f"${aggregate.get('AvailableFunds', 0):,.0f}",
+                margin_used=f"${aggregate.get('MaintMarginReq', 0):,.0f}"
             )
-            
-            return summary
+
+            return aggregate
             
         except Exception as e:
             self.logger.error(f"Failed to get account summary: {e}")
@@ -238,13 +265,8 @@ class PortfolioManager:
         """
         try:
             account = self.get_account_summary()
-            gross_pos_cad = account.get('GrossPositionValue', 0)
-            nlv_cad = account.get('NetLiquidation', 0)
-            
-            # Convert to USD
-            fx_rate = self.market_data.get_fx_rate()
-            gross_pos_usd = gross_pos_cad / fx_rate
-            nlv_usd = nlv_cad / fx_rate
+            gross_pos_usd = account.get('GrossPositionValue', 0)
+            nlv_usd = account.get('NetLiquidation', 0)
             
             if nlv_usd <= 0:
                 return 0.0
@@ -312,9 +334,8 @@ class PortfolioManager:
                 except Exception as e:
                     self.logger.warning(f"Could not calculate value for {symbol}: {e}")
             
-            # Allow for some discrepancy due to FX conversion and timing
-            fx_rate = self.market_data.get_fx_rate()
-            expected_value = gross_pos / fx_rate
+            # Allow for some discrepancy due to timing differences
+            expected_value = gross_pos
             discrepancy = abs(total_value - expected_value) / expected_value if expected_value > 0 else 0
             
             if discrepancy > 0.15:  # 15% tolerance for FX and timing differences

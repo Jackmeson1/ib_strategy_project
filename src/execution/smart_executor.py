@@ -8,6 +8,7 @@ margin checks and partial fill handling to address production-level issues
 seen with simple market orders.
 
 
+
 For full fire-all-then-monitor behaviour see :class:`BatchOrderExecutor`.
 
 """

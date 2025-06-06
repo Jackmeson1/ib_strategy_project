@@ -1,3 +1,4 @@
 from .delay import wait
+from .currency import convert
 
-__all__ = ["wait"]
+__all__ = ["wait", "convert"]
