@@ -1,3 +1,4 @@
+
 """Smart Order Executor with enhanced order management, margin control and
 parallel batch execution.
 
