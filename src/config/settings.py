@@ -114,4 +114,3 @@ if __name__ == "__main__":
     if not env_example_path.exists():
         with open(env_example_path, "w") as f:
             f.write(ENV_TEMPLATE)
-        print(f"Created {env_example_path}") 

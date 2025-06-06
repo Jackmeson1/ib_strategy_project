@@ -17,7 +17,12 @@ from src.core.types import (
     ExecutionResult, Order, OrderAction, OrderStatus, Trade
 )
 from src.portfolio.manager import PortfolioManager
+
+from src.utils.logger import get_logger
+from src.utils.delay import wait
+
 from .base_executor import BaseExecutor
+
 
 
 class BatchOrderExecutor(BaseExecutor):
@@ -140,8 +145,10 @@ class BatchOrderExecutor(BaseExecutor):
                     contract = self.contracts.get(order.symbol)
                     if contract:
                         ticker = self.ib.reqMktData(contract, '', False, False)
+
                         # Keep IB event loop active while waiting for price
                         self.ib.sleep(0.1)
+
                         
                         price = ticker.marketPrice()
                         if price and price > 0:
@@ -244,8 +251,10 @@ class BatchOrderExecutor(BaseExecutor):
         # Get current market price
         contract = self.contracts.get(order.symbol)
         ticker = self.ib.reqMktData(contract, '', False, False)
+
         # Allow the event loop to process data while waiting
         self.ib.sleep(0.1)
+
         
         market_price = ticker.marketPrice()
         order_value = market_price * order.quantity if market_price else 0
@@ -375,8 +384,10 @@ class BatchOrderExecutor(BaseExecutor):
                     self.logger.info(f"⚡ Immediate fill detected for {symbol}")
 
                     return self._validate_fill(trade)
+
                 # Keep event loop alive during quick checks
                 self.ib.sleep(0.1)
+
 
             
             # Regular monitoring loop
@@ -396,6 +407,8 @@ class BatchOrderExecutor(BaseExecutor):
                             self.logger.info(f"✅ Accepting partial fill for {symbol}: {fill_ratio:.1%}")
                             return True
                     
+
+
                     # Brief sleep to prevent busy waiting while keeping IB responsive
                     self.ib.sleep(0.5)
                 
@@ -403,6 +416,7 @@ class BatchOrderExecutor(BaseExecutor):
                     self.logger.warning(f"Monitoring error for {symbol}: {e}")
                     # Longer pause on errors without blocking event loop
                     self.ib.sleep(1)
+
             
             # Timeout reached
             self.logger.warning(f"⏰ Order timeout for {symbol} after {self.order_timeout}s")
@@ -410,8 +424,10 @@ class BatchOrderExecutor(BaseExecutor):
             # Try to cancel the order
             try:
                 self.ib.cancelOrder(trade.order)
+
                 # Give IB time to process cancellation
                 self.ib.sleep(1)
+
                 
                 # Check final fill status
                 if trade.orderStatus.filled > 0:

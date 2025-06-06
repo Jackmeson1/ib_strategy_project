@@ -21,6 +21,10 @@ from ib_insync import Trade as IBTrade
 from src.config.settings import Config
 from src.core.types import ExecutionResult, Order, OrderAction, OrderStatus, RebalanceRequest, Trade
 from src.portfolio.manager import PortfolioManager
+
+from src.utils.logger import get_logger
+from src.utils.delay import wait
+
 from .base_executor import BaseExecutor
 
 
@@ -213,7 +217,9 @@ class SmartOrderExecutor(BaseExecutor):
                     contract = self.contracts.get(symbol)
                     if contract:
                         ticker = self.ib.reqMktData(contract, '', False, False)
-                        self.ib.sleep(1)  # Wait for price
+
+                        wait(1, self.ib)  # Wait for price
+                        
 
                         current_price = None
                         if ticker.last and ticker.last > 0:
@@ -315,7 +321,9 @@ class SmartOrderExecutor(BaseExecutor):
 
             # Get market data
             ticker = self.ib.reqMktData(contract, '', False, False)
-            self.ib.sleep(0.5)
+
+            wait(0.5, self.ib)
+            
 
             current_price = None
             if ticker.last and ticker.last > 0:
@@ -451,8 +459,8 @@ class SmartOrderExecutor(BaseExecutor):
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
 
-                # Use IB.sleep so the event loop remains active during pauses
-                self.ib.sleep(2)
+                wait(2, self.ib)
+
             
 
             # Monitor leverage after each batch
@@ -579,11 +587,10 @@ class SmartOrderExecutor(BaseExecutor):
                 if current_ib_trade and not order_placed:
                     try:
                         self.ib.cancelOrder(current_ib_trade.order)
-                        self.logger.info(
-                            f"Cancelled previous order for {smart_order.base_order.symbol}"
-                        )
-                        # Keep event loop responsive while waiting
-                        self.ib.sleep(0.5)
+
+                        self.logger.info(f"Cancelled previous order for {smart_order.base_order.symbol}")
+                        wait(0.5, self.ib)  # Brief pause after cancellation
+
                     except Exception as e:
                         self.logger.warning(f"Failed to cancel previous order: {e}")
 
@@ -626,14 +633,16 @@ class SmartOrderExecutor(BaseExecutor):
                         try:
                             if current_ib_trade:
                                 self.ib.cancelOrder(current_ib_trade.order)
-                                # Allow IB event loop to process cancellation
-                                self.ib.sleep(1)
+
+                                wait(1, self.ib)  # Wait for cancellation
+
                         except Exception as e:
                             self.logger.warning(f"Failed to cancel timed-out order: {e}")
 
                         order_placed = False
-                        # Short pause before retry while keeping IB responsive
-                        self.ib.sleep(2)
+
+                        wait(2, self.ib)  # Brief pause before retry
+
                         continue
                     else:
                         self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol}")
@@ -653,8 +662,9 @@ class SmartOrderExecutor(BaseExecutor):
 
                 if smart_order.retry_count <= smart_order.max_retries:
                     order_placed = False
-                    # Give IB time after error before retrying
-                    self.ib.sleep(3)
+
+                    wait(3, self.ib)  # Longer pause on error
+
                     continue
                 else:
                     self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol} after error")
@@ -702,6 +712,7 @@ class SmartOrderExecutor(BaseExecutor):
         stall_threshold = 10   # Time without status change before refresh
 
         for quick_check in range(max_immediate_checks):
+
             self.ib.sleep(0.1)  # Very brief pause
 
             # Refresh connection if no status update
@@ -730,6 +741,7 @@ class SmartOrderExecutor(BaseExecutor):
 
         # If not immediately filled, do regular monitoring with timeout
         while time.time() - start_time < timeout_seconds:
+
             self.ib.sleep(check_interval)
 
             # Refresh connection if status hasn't changed
@@ -738,6 +750,7 @@ class SmartOrderExecutor(BaseExecutor):
                 and time.time() - last_refresh > refresh_interval
             ):
                 self.logger.debug("Refreshing connection via reqIds")
+
                 self.ib.reqIds(-1)
                 last_refresh = time.time()
 
@@ -844,7 +857,7 @@ class SmartOrderExecutor(BaseExecutor):
                 # Try to get a reasonable price estimate
                 try:
                     ticker = self.ib.reqMktData(ib_trade.contract, '', False, False)
-                    self.ib.sleep(0.5)
+                    wait(0.5, self.ib)
                     if ticker.last and ticker.last > 0:
                         avg_price = ticker.last
                     elif ticker.close and ticker.close > 0:
