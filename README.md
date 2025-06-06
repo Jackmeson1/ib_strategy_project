@@ -4,11 +4,11 @@ A production-ready portfolio rebalancing tool for Interactive Brokers with advan
 
 ## 🆕 P0 Production Fixes (Latest)
 
-✅ **P0-A: True Batch Execution** - Fire-all-then-monitor with thread pools (no per-order hanging)  
-✅ **P0-B: Single Canonical Entrypoint** - `main.py` with feature-based execution control  
-✅ **P0-C: Fail-fast Timeouts & Alerts** - Global watchdog with configurable runtime limits  
-✅ **P0-D: Atomic Margin Check** - Batch-level margin validation before execution  
-✅ **P0-E: Config Isolation** - All sensitive values in `.env` with comprehensive template  
+✅ **P0-A: True Batch Execution** - Fire-all-then-monitor with thread pools (no per-order hanging)
+✅ **P0-B: Single Canonical Entrypoint** - `main.py` with feature-based execution control
+✅ **P0-C: Fail-fast Timeouts & Alerts** - Global watchdog with configurable runtime limits
+✅ **P0-D: Atomic Margin Check** - Batch-level margin validation before execution
+✅ **P0-E: Config Isolation** - All sensitive values in `.env` with comprehensive template
 
 ## Overview
 
@@ -63,6 +63,8 @@ cp config/env.example .env
 # Edit .env with your IB credentials and settings
 ```
 
+To load a different file, pass `--env-file my.env` (or use `docker run --env-file my.env`).
+
 ## Configuration
 
 Create `.env` file from template (see `config/env.example`):
@@ -84,6 +86,9 @@ MAX_RUNTIME=1800
 # Safety
 DRY_RUN=true  # Set to false for live trading
 ```
+
+Values can also be stored securely in your OS keyring using the service name
+`ib-portfolio-rebalancer`. Keyring values override entries in `.env`.
 
 **⚠️ Security**: Never commit your `.env` file! Keep credentials secure.
 
@@ -187,7 +192,7 @@ python main.py --verbose --batch-execution --dry-run
 
 ### P0 Production Safeguards
 1. **Watchdog Timer**: Kills hung processes automatically
-2. **Atomic Margin Validation**: Prevents unsafe batch execution  
+2. **Atomic Margin Validation**: Prevents unsafe batch execution
 3. **Batch Execution**: No per-order hanging risks
 4. **Config Isolation**: No hardcoded credentials
 5. **Graceful Timeouts**: SIGINT/SIGTERM handling
@@ -227,6 +232,10 @@ TELEGRAM_CHAT_ID=your_chat_id
 ```bash
 pytest tests/
 ```
+The test suite includes a reusable **MockIBGateway** located under
+`tests/mock_gateway.py`. It simulates IB responses so end-to-end
+scenarios for `BatchOrderExecutor` and `PortfolioManager` run without a
+live connection.
 
 ### Code Quality
 ```bash
@@ -297,4 +306,4 @@ python main.py --batch-execution --smart-orders --hanging-protection --atomic-ma
 
 ## License
 
-MIT License - see LICENSE file for details 
+MIT License - see LICENSE file for details
