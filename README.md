@@ -232,6 +232,10 @@ TELEGRAM_CHAT_ID=your_chat_id
 ```bash
 pytest tests/
 ```
+The test suite includes a reusable **MockIBGateway** located under
+`tests/mock_gateway.py`. It simulates IB responses so end-to-end
+scenarios for `BatchOrderExecutor` and `PortfolioManager` run without a
+live connection.
 
 ### Code Quality
 ```bash

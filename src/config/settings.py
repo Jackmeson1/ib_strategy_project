@@ -35,10 +35,12 @@ def getenv(name: str, default: Optional[str] = None) -> Optional[str]:
 class IBConfig:
     """Interactive Brokers connection configuration."""
 
+
     host: str = field(default_factory=lambda: getenv("IB_GATEWAY_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(getenv("IB_GATEWAY_PORT", "4002")))
     client_id: int = field(default_factory=lambda: int(getenv("IB_CLIENT_ID", "1")))
     account_id: str = field(default_factory=lambda: getenv("IB_ACCOUNT_ID", ""))
+
 
     def __post_init__(self):
         if not self.account_id:
@@ -119,7 +121,7 @@ def load_config() -> Config:
 # Example environment template
 ENV_TEMPLATE = """# Interactive Brokers Configuration
 IB_GATEWAY_HOST=127.0.0.1
-IB_GATEWAY_PORT=4002  # Use 7497 for TWS paper, 7496 for TWS live
+IB_GATEWAY_PORT=7497  # Paper: 7497, Live: 7496, Gateway: 4002/4001
 IB_CLIENT_ID=1
 IB_ACCOUNT_ID=YOUR_ACCOUNT_ID
 
