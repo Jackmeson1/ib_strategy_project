@@ -6,6 +6,10 @@ This executor runs orders in small batches using a thread pool so multiple
 orders can be processed concurrently. It includes extensive retry logic,
 margin checks and partial fill handling to address production-level issues
 seen with simple market orders.
+
+
+For full fire-all-then-monitor behaviour see :class:`BatchOrderExecutor`.
+
 """
 
 import signal
