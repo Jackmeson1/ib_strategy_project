@@ -78,12 +78,14 @@ pre-commit:
 	pre-commit run --all-files
 
 # Docker commands (if using Docker)
+ENV_FILE ?= .env
+
 docker-build:
 	docker build -t dynamic-leverage-bot .
 
 docker-run:
-	docker run --rm -it --env-file .env dynamic-leverage-bot
+	docker run --rm -it --env-file $(ENV_FILE) dynamic-leverage-bot
 
 # Development server with auto-reload (useful for testing)
 dev:
-	python main.py --debug --dry-run 
+	python main.py --debug --dry-run

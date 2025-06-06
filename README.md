@@ -63,7 +63,22 @@ cp config/env.example .env
 # Edit .env with your IB credentials and settings
 ```
 
+
 To load a different file, pass `--env-file my.env` (or use `docker run --env-file my.env`).
+
+### Docker
+
+Build the image and run the bot in an isolated container:
+
+```bash
+# Build image
+make docker-build
+
+# Run with your environment
+make docker-run         # uses .env
+# or specify a custom file
+ENV_FILE=prod.env make docker-run
+```
 
 ## Configuration
 
