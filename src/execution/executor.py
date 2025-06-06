@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from ib_insync import IB, Contract, MarketOrder, LimitOrder, Trade as IBTrade
+from ib_insync import IB, Contract, MarketOrder, Trade as IBTrade
 
 from src.config.settings import Config
 from src.core.exceptions import (
@@ -17,10 +17,10 @@ from src.core.types import (
     RebalanceRequest, Trade
 )
 from src.portfolio.manager import PortfolioManager
-from src.utils.logger import get_logger
+from .base_executor import BaseExecutor
 
 
-class OrderExecutor:
+class OrderExecutor(BaseExecutor):
     """Handles order execution with safety checks and batch processing."""
     
     def __init__(
@@ -30,11 +30,7 @@ class OrderExecutor:
         config: Config,
         contracts: Dict[str, Contract]
     ):
-        self.ib = ib
-        self.portfolio_manager = portfolio_manager
-        self.config = config
-        self.contracts = contracts
-        self.logger = get_logger(__name__)
+        super().__init__(ib, portfolio_manager, config, contracts)
         
         # Execution parameters
         self.max_order_timeout = 300  # 5 minutes
@@ -300,7 +296,7 @@ class OrderExecutor:
             if ib_trade.isDone():
                 # Order completed
                 if ib_trade.orderStatus.status == "Filled":
-                    return self._create_trade_from_ib(order, ib_trade)
+                    return self._create_trade_from_ib(ib_trade, order)
                 elif ib_trade.orderStatus.status == "Cancelled":
                     raise OrderExecutionError(f"Order cancelled: {ib_trade.orderStatus.status}")
                 else:
@@ -317,21 +313,8 @@ class OrderExecutor:
         # Timeout - check if partially filled
         if ib_trade.orderStatus.filled > 0:
             self.logger.warning(f"Order for {order.symbol} partially filled on timeout")
-            return self._create_trade_from_ib(order, ib_trade)
+            return self._create_trade_from_ib(ib_trade, order)
         else:
             # Cancel the order
             self.ib.cancelOrder(ib_trade.order)
             raise RetryableError(f"Order timeout for {order.symbol}")
-    
-    def _create_trade_from_ib(self, order: Order, ib_trade: IBTrade) -> Trade:
-        """Create Trade object from IB trade."""
-        return Trade(
-            order_id=ib_trade.order.orderId,
-            symbol=order.symbol,
-            action=order.action,
-            quantity=ib_trade.orderStatus.filled,
-            fill_price=ib_trade.orderStatus.avgFillPrice or 0,
-            commission=sum(fill.commissionReport.commission for fill in ib_trade.fills) if ib_trade.fills else 0,
-            timestamp=datetime.now(),
-            status=OrderStatus(ib_trade.orderStatus.status)
-        ) 

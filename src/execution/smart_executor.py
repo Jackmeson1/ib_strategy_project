@@ -23,7 +23,7 @@ from src.core.types import (
     RebalanceRequest
 )
 from src.portfolio.manager import PortfolioManager
-from src.utils.logger import get_logger
+from .base_executor import BaseExecutor
 
 
 class OrderType(Enum):
@@ -75,7 +75,7 @@ class MarginCheck:
     warning_message: Optional[str] = None
 
 
-class SmartOrderExecutor:
+class SmartOrderExecutor(BaseExecutor):
     """
     Production-ready order executor with:
     - Smart order types (Limit, Market, Stop)
@@ -92,11 +92,7 @@ class SmartOrderExecutor:
         config: Config,
         contracts: Dict[str, Contract]
     ):
-        self.ib = ib
-        self.portfolio_manager = portfolio_manager
-        self.config = config
-        self.contracts = contracts
-        self.logger = get_logger(__name__)
+        super().__init__(ib, portfolio_manager, config, contracts)
         
         # Execution parameters
         self.max_parallel_orders = 3  # Conservative parallel execution
@@ -791,68 +787,3 @@ class SmartOrderExecutor:
             status=OrderStatus.PARTIALLY_FILLED
         )
     
-    def _create_trade_from_ib(self, ib_trade: IBTrade) -> Trade:
-        """Create trade object from completed IB trade - enhanced error handling."""
-        try:
-            # Get order details with fallback values
-            order_id = getattr(ib_trade.order, 'orderId', 0)
-            symbol = getattr(ib_trade.contract, 'symbol', 'UNKNOWN')
-            action_str = getattr(ib_trade.order, 'action', 'BUY')
-            
-            # Get fill details with validation
-            filled_qty = getattr(ib_trade.orderStatus, 'filled', 0)
-            avg_price = getattr(ib_trade.orderStatus, 'avgFillPrice', 0.0)
-            
-            # Validate fill data
-            if filled_qty <= 0:
-                self.logger.warning(f"Invalid filled quantity for {symbol}: {filled_qty}")
-                filled_qty = getattr(ib_trade.order, 'totalQuantity', 0)
-            
-            if avg_price <= 0:
-                self.logger.warning(f"Invalid fill price for {symbol}: {avg_price}")
-                # Try to get a reasonable price estimate
-                try:
-                    ticker = self.ib.reqMktData(ib_trade.contract, '', False, False)
-                    self.ib.sleep(0.5)
-                    if ticker.last and ticker.last > 0:
-                        avg_price = ticker.last
-                    elif ticker.close and ticker.close > 0:
-                        avg_price = ticker.close
-                    self.ib.cancelMktData(ib_trade.contract)
-                except Exception as e:
-                    self.logger.warning(f"Could not get market price for {symbol}: {e}")
-                    avg_price = 1.0  # Fallback
-            
-            # Determine order status
-            status = OrderStatus.FILLED
-            if hasattr(ib_trade.orderStatus, 'status'):
-                if ib_trade.orderStatus.status == 'PartiallyFilled':
-                    status = OrderStatus.PARTIALLY_FILLED
-            
-            trade = Trade(
-                order_id=order_id,
-                symbol=symbol,
-                action=OrderAction.BUY if action_str == 'BUY' else OrderAction.SELL,
-                quantity=int(filled_qty),
-                fill_price=float(avg_price),
-                commission=0,  # Would be updated from execution reports
-                timestamp=datetime.now(),
-                status=status
-            )
-            
-            self.logger.debug(f"Created trade: {symbol} {action_str} {filled_qty} @ ${avg_price:.2f}")
-            return trade
-            
-        except Exception as e:
-            self.logger.error(f"Error creating trade from IB trade: {e}")
-            # Return a minimal trade object as fallback
-            return Trade(
-                order_id=0,
-                symbol="ERROR",
-                action=OrderAction.BUY,
-                quantity=0,
-                fill_price=0.0,
-                commission=0,
-                timestamp=datetime.now(),
-                status=OrderStatus.FILLED
-            ) 
