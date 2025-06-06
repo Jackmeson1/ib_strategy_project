@@ -1,4 +1,14 @@
+"""Smart Order Executor with enhanced order management, margin control and
+parallel batch execution.
+
+This executor runs orders in small batches using a thread pool so multiple
+orders can be processed concurrently.  It includes extensive retry logic,
+margin checks and partial fill handling to address production-level issues
+seen with simple market orders.
 """
+
+
+=======
 Smart Order Executor with enhanced order management, margin control and retry
 logic.
 
@@ -6,6 +16,7 @@ This executor runs orders in prioritized batches. Each batch executes
 concurrently using a small thread pool to avoid hanging while containing risk.
 For full fire-all-then-monitor behaviour see :class:`BatchOrderExecutor`.
 """
+
 import signal
 import threading
 import time
@@ -22,14 +33,17 @@ from src.config.settings import Config
 from src.core.types import ExecutionResult, Order, OrderAction, OrderStatus, RebalanceRequest, Trade
 from src.portfolio.manager import PortfolioManager
 
+
 from src.utils.logger import get_logger
 from src.utils.delay import wait
+
 
 from .base_executor import BaseExecutor
 
 
 class OrderType(Enum):
     """Enhanced order types for smart execution."""
+
     MARKET = "MKT"
     LIMIT = "LMT"
     STOP = "STP"
@@ -38,14 +52,16 @@ class OrderType(Enum):
 
 class OrderPriority(Enum):
     """Order execution priority levels."""
-    HIGH = "HIGH"      # Large positions, immediate execution needed
-    MEDIUM = "MEDIUM"   # Standard rebalancing
-    LOW = "LOW"        # Small adjustments
+
+    HIGH = "HIGH"  # Large positions, immediate execution needed
+    MEDIUM = "MEDIUM"  # Standard rebalancing
+    LOW = "LOW"  # Small adjustments
 
 
 @dataclass
 class SmartOrder:
     """Enhanced order with retry logic and execution parameters."""
+
     base_order: Order
     order_type: OrderType = OrderType.LIMIT
     priority: OrderPriority = OrderPriority.MEDIUM
@@ -70,6 +86,7 @@ class SmartOrder:
 @dataclass
 class MarginCheck:
     """Margin and buying power validation."""
+
     available_funds: float
     required_funds: float
     margin_cushion: float
@@ -95,15 +112,14 @@ class SmartOrderExecutor(BaseExecutor):
         ib: IB,
         portfolio_manager: PortfolioManager,
         config: Config,
-        contracts: Dict[str, Contract]
+        contracts: Dict[str, Contract],
     ):
 
         super().__init__(ib, portfolio_manager, config, contracts)
-        
 
         # Execution parameters
         self.max_parallel_orders = 3  # Conservative parallel execution
-        self.margin_cushion = 0.2     # 20% margin safety buffer
+        self.margin_cushion = 0.2  # 20% margin safety buffer
 
         # Order management
         self.active_orders: Dict[str, SmartOrder] = {}
@@ -112,10 +128,10 @@ class SmartOrderExecutor(BaseExecutor):
     def execute_rebalance(self, request: RebalanceRequest) -> ExecutionResult:
         """
         Execute rebalance with smart order management.
-        
+
         Args:
             request: Rebalance request with target positions
-            
+
         Returns:
             ExecutionResult with detailed execution info
         """
@@ -124,7 +140,7 @@ class SmartOrderExecutor(BaseExecutor):
             "Starting smart rebalance execution",
             target_leverage=request.target_leverage,
             reason=request.reason,
-            dry_run=request.dry_run
+            dry_run=request.dry_run,
         )
 
         try:
@@ -138,13 +154,12 @@ class SmartOrderExecutor(BaseExecutor):
                     orders_failed=[],
                     total_commission=0,
                     execution_time=time.time() - start_time,
-                    errors=[f"Margin safety violation: {margin_check.warning_message}"]
+                    errors=[f"Margin safety violation: {margin_check.warning_message}"],
                 )
 
             # 2. Calculate smart orders with position sizing
             smart_orders = self._calculate_smart_orders(
-                request.target_positions,
-                margin_check.available_funds
+                request.target_positions, margin_check.available_funds
             )
 
             if not smart_orders:
@@ -155,7 +170,7 @@ class SmartOrderExecutor(BaseExecutor):
                     orders_failed=[],
                     total_commission=0,
                     execution_time=time.time() - start_time,
-                    errors=[]
+                    errors=[],
                 )
 
             if request.dry_run:
@@ -171,7 +186,7 @@ class SmartOrderExecutor(BaseExecutor):
                     orders_failed=[],
                     total_commission=0,
                     execution_time=time.time() - start_time,
-                    errors=[]
+                    errors=[],
                 )
 
             # 3. Execute with smart batching and retry logic
@@ -185,16 +200,16 @@ class SmartOrderExecutor(BaseExecutor):
                 orders_failed=[],
                 total_commission=0,
                 execution_time=time.time() - start_time,
-                errors=[str(e)]
+                errors=[str(e)],
             )
 
     def _check_margin_safety(self, target_positions: Dict[str, int]) -> MarginCheck:
         """
         Comprehensive margin and buying power check before execution.
-        
+
         Args:
             target_positions: Target positions to achieve
-            
+
         Returns:
             MarginCheck with safety assessment
         """
@@ -202,24 +217,28 @@ class SmartOrderExecutor(BaseExecutor):
             account = self.portfolio_manager.get_account_summary()
             current_positions = self.portfolio_manager.get_positions()
 
-            available_funds = account.get('AvailableFunds', 0)
-            buying_power = account.get('BuyingPower', 0)
-            nlv = account.get('NetLiquidation', 0)
+            available_funds = account.get("AvailableFunds", 0)
+            buying_power = account.get("BuyingPower", 0)
+            nlv = account.get("NetLiquidation", 0)
 
             # Calculate required funds for new positions
             required_funds = 0
             for symbol, target_qty in target_positions.items():
-                current_qty = current_positions.get(symbol, type('obj', (object,), {'quantity': 0})).quantity
+                current_qty = current_positions.get(
+                    symbol, type("obj", (object,), {"quantity": 0})
+                ).quantity
                 qty_diff = target_qty - current_qty
 
                 if qty_diff > 0:  # Only count additional purchases
                     # Get current market price
                     contract = self.contracts.get(symbol)
                     if contract:
+
                         ticker = self.ib.reqMktData(contract, '', False, False)
 
                         wait(1, self.ib)  # Wait for price
                         
+
 
                         current_price = None
                         if ticker.last and ticker.last > 0:
@@ -263,7 +282,7 @@ class SmartOrderExecutor(BaseExecutor):
                 required_funds=f"${required_funds:,.0f}",
                 available_funds=f"${available_funds:,.0f}",
                 margin_cushion=f"{self.margin_cushion:.1%}",
-                is_safe=is_safe
+                is_safe=is_safe,
             )
 
             return MarginCheck(
@@ -271,7 +290,7 @@ class SmartOrderExecutor(BaseExecutor):
                 required_funds=required_funds,
                 margin_cushion=self.margin_cushion,
                 is_safe=is_safe,
-                warning_message=warning_message
+                warning_message=warning_message,
             )
 
         except Exception as e:
@@ -281,21 +300,19 @@ class SmartOrderExecutor(BaseExecutor):
                 required_funds=0,
                 margin_cushion=0,
                 is_safe=False,
-                warning_message=f"Margin check error: {str(e)}"
+                warning_message=f"Margin check error: {str(e)}",
             )
 
     def _calculate_smart_orders(
-        self,
-        target_positions: Dict[str, int],
-        available_funds: float
+        self, target_positions: Dict[str, int], available_funds: float
     ) -> List[SmartOrder]:
         """
         Calculate smart orders with position sizing and order type optimization.
-        
+
         Args:
             target_positions: Target positions to achieve
             available_funds: Available funds for trading
-            
+
         Returns:
             List of SmartOrder objects with optimal execution parameters
         """
@@ -307,7 +324,9 @@ class SmartOrderExecutor(BaseExecutor):
         order_requirements = []
 
         for symbol, target_qty in target_positions.items():
-            current_qty = current_positions.get(symbol, type('obj', (object,), {'quantity': 0})).quantity
+            current_qty = current_positions.get(
+                symbol, type("obj", (object,), {"quantity": 0})
+            ).quantity
             qty_diff = target_qty - current_qty
 
             if abs(qty_diff) < 1:  # Skip negligible differences
@@ -320,10 +339,10 @@ class SmartOrderExecutor(BaseExecutor):
                 continue
 
             # Get market data
+
             ticker = self.ib.reqMktData(contract, '', False, False)
 
             wait(0.5, self.ib)
-            
 
             current_price = None
             if ticker.last and ticker.last > 0:
@@ -351,7 +370,7 @@ class SmartOrderExecutor(BaseExecutor):
             self.logger.warning(
                 f"Position sizing applied: {scaling_factor:.2%} of original order sizes",
                 total_required=f"${total_required:,.0f}",
-                available=f"${available_funds:,.0f}"
+                available=f"${available_funds:,.0f}",
             )
 
         # Create smart orders
@@ -363,11 +382,7 @@ class SmartOrderExecutor(BaseExecutor):
                 continue
 
             action = OrderAction.BUY if scaled_qty > 0 else OrderAction.SELL
-            base_order = Order(
-                symbol=symbol,
-                action=action,
-                quantity=abs(scaled_qty)
-            )
+            base_order = Order(symbol=symbol, action=action, quantity=abs(scaled_qty))
 
             # Determine order type and priority based on size and volatility
             order_value = abs(scaled_qty) * current_price
@@ -388,7 +403,7 @@ class SmartOrderExecutor(BaseExecutor):
                 priority=priority,
                 limit_price=limit_price,
                 max_retries=3 if order_value > 10000 else 2,  # More retries for large orders
-                timeout_seconds=180 if order_value > 25000 else 120
+                timeout_seconds=180 if order_value > 25000 else 120,
             )
 
             smart_orders.append(smart_order)
@@ -399,7 +414,7 @@ class SmartOrderExecutor(BaseExecutor):
                 quantity=abs(scaled_qty),
                 order_type=order_type.value,
                 priority=priority.value,
-                value=f"${order_value:,.0f}"
+                value=f"${order_value:,.0f}",
             )
 
         return smart_orders
@@ -421,9 +436,7 @@ class SmartOrderExecutor(BaseExecutor):
             return OrderPriority.LOW
 
     def _execute_smart_batches(
-        self,
-        smart_orders: List[SmartOrder],
-        target_leverage: float
+        self, smart_orders: List[SmartOrder], target_leverage: float
     ) -> ExecutionResult:
         """Execute smart orders in optimized batches with parallel processing.
 
@@ -442,12 +455,13 @@ class SmartOrderExecutor(BaseExecutor):
         # Create batches with parallel execution capability
         batch_size = min(self.max_parallel_orders, len(smart_orders))
         batches = [
-            smart_orders[i:i + batch_size]
-            for i in range(0, len(smart_orders), batch_size)
+            smart_orders[i : i + batch_size] for i in range(0, len(smart_orders), batch_size)
         ]
 
         for batch_idx, batch in enumerate(batches):
-            self.logger.info(f"Executing smart batch {batch_idx + 1}/{len(batches)} with {len(batch)} orders")
+            self.logger.info(
+                f"Executing smart batch {batch_idx + 1}/{len(batches)} with {len(batch)} orders"
+            )
 
             # Execute batch with parallel processing
             batch_result = self._execute_parallel_batch(batch)
@@ -459,9 +473,11 @@ class SmartOrderExecutor(BaseExecutor):
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
 
+
                 wait(2, self.ib)
 
             
+
 
             # Monitor leverage after each batch
             try:
@@ -483,7 +499,7 @@ class SmartOrderExecutor(BaseExecutor):
             orders_failed=all_failed,
             total_commission=total_commission,
             execution_time=time.time() - start_time,
-            errors=all_errors
+            errors=all_errors,
         )
 
     def _execute_parallel_batch(self, smart_orders: List[SmartOrder]) -> ExecutionResult:
@@ -503,11 +519,11 @@ class SmartOrderExecutor(BaseExecutor):
 
         max_order_timeout = max(order.timeout_seconds for order in smart_orders)
 
-        self.logger.info(
-            f"Starting parallel batch with {len(smart_orders)} orders"
-        )
+        self.logger.info(f"Starting parallel batch with {len(smart_orders)} orders")
 
-        with ThreadPoolExecutor(max_workers=min(len(smart_orders), self.max_parallel_orders)) as executor:
+        with ThreadPoolExecutor(
+            max_workers=min(len(smart_orders), self.max_parallel_orders)
+        ) as executor:
             future_map = {
                 executor.submit(
                     self._execute_single_smart_order_with_timeout,
@@ -545,15 +561,18 @@ class SmartOrderExecutor(BaseExecutor):
             errors=errors,
         )
 
-    def _execute_single_smart_order_with_timeout(self, smart_order: SmartOrder, max_timeout: int) -> Optional[Trade]:
+    def _execute_single_smart_order_with_timeout(
+        self, smart_order: SmartOrder, max_timeout: int
+    ) -> Optional[Trade]:
         """Execute single order with additional timeout protection."""
+
         def timeout_handler(signum, frame):
             raise TimeoutError(f"Order execution timeout for {smart_order.base_order.symbol}")
 
         # Set up timeout protection (Unix-like systems only)
         old_handler = None
         try:
-            if hasattr(signal, 'SIGALRM'):
+            if hasattr(signal, "SIGALRM"):
                 old_handler = signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(max_timeout + 30)  # Extra 30s buffer
         except (AttributeError, OSError):
@@ -568,7 +587,7 @@ class SmartOrderExecutor(BaseExecutor):
         finally:
             # Clean up timeout
             try:
-                if hasattr(signal, 'SIGALRM') and old_handler is not None:
+                if hasattr(signal, "SIGALRM") and old_handler is not None:
                     signal.alarm(0)
                     signal.signal(signal.SIGALRM, old_handler)
             except (AttributeError, OSError):
@@ -581,7 +600,9 @@ class SmartOrderExecutor(BaseExecutor):
 
         for attempt in range(smart_order.max_retries + 1):
             try:
-                self.logger.info(f"Executing {smart_order.base_order.symbol} (attempt {attempt + 1}/{smart_order.max_retries + 1})")
+                self.logger.info(
+                    f"Executing {smart_order.base_order.symbol} (attempt {attempt + 1}/{smart_order.max_retries + 1})"
+                )
 
                 # Cancel any previous order if it exists and isn't filled
                 if current_ib_trade and not order_placed:
@@ -618,7 +639,9 @@ class SmartOrderExecutor(BaseExecutor):
                     partial_result = self._handle_partial_fill(smart_order, current_ib_trade)
                     if partial_result:
                         # If partial fill is acceptable, return what we got
-                        self.logger.info(f"Accepting partial fill for {smart_order.base_order.symbol}")
+                        self.logger.info(
+                            f"Accepting partial fill for {smart_order.base_order.symbol}"
+                        )
                         return self._create_trade_from_partial(smart_order, current_ib_trade)
 
                     # Order failed or timed out - prepare for retry
@@ -645,7 +668,9 @@ class SmartOrderExecutor(BaseExecutor):
 
                         continue
                     else:
-                        self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol}")
+                        self.logger.error(
+                            f"Max retries exceeded for {smart_order.base_order.symbol}"
+                        )
                         break
 
             except Exception as e:
@@ -656,7 +681,9 @@ class SmartOrderExecutor(BaseExecutor):
                 if current_ib_trade and order_placed:
                     try:
                         self.ib.cancelOrder(current_ib_trade.order)
-                        self.logger.info(f"Cancelled order due to error: {smart_order.base_order.symbol}")
+                        self.logger.info(
+                            f"Cancelled order due to error: {smart_order.base_order.symbol}"
+                        )
                     except Exception as cancel_error:
                         self.logger.warning(f"Failed to cancel order after error: {cancel_error}")
 
@@ -667,14 +694,18 @@ class SmartOrderExecutor(BaseExecutor):
 
                     continue
                 else:
-                    self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol} after error")
+                    self.logger.error(
+                        f"Max retries exceeded for {smart_order.base_order.symbol} after error"
+                    )
                     break
 
         # Clean up any remaining order
         if current_ib_trade and order_placed:
             try:
                 self.ib.cancelOrder(current_ib_trade.order)
-                self.logger.info(f"Final cleanup: cancelled order for {smart_order.base_order.symbol}")
+                self.logger.info(
+                    f"Final cleanup: cancelled order for {smart_order.base_order.symbol}"
+                )
             except Exception as e:
                 self.logger.warning(f"Failed final order cleanup: {e}")
 
@@ -690,9 +721,7 @@ class SmartOrderExecutor(BaseExecutor):
 
         elif smart_order.order_type == OrderType.LIMIT:
             return LimitOrder(
-                action=action,
-                totalQuantity=quantity,
-                lmtPrice=smart_order.limit_price
+                action=action, totalQuantity=quantity, lmtPrice=smart_order.limit_price
             )
 
         else:  # Fallback to market
@@ -705,11 +734,11 @@ class SmartOrderExecutor(BaseExecutor):
         max_immediate_checks = 5  # Check immediately filled orders quickly
 
         # First, do a few quick checks for immediate fills (market orders)
-        last_status = getattr(ib_trade.orderStatus, 'status', None)
+        last_status = getattr(ib_trade.orderStatus, "status", None)
         last_update = time.time()
         last_refresh = 0.0
         refresh_interval = 15  # Minimum seconds between reqIds calls
-        stall_threshold = 10   # Time without status change before refresh
+        stall_threshold = 10  # Time without status change before refresh
 
         for quick_check in range(max_immediate_checks):
 
@@ -725,18 +754,20 @@ class SmartOrderExecutor(BaseExecutor):
                 last_refresh = time.time()
 
             # Check if already filled
-            if hasattr(ib_trade.orderStatus, 'status'):
+            if hasattr(ib_trade.orderStatus, "status"):
                 status = ib_trade.orderStatus.status
                 if status != last_status:
                     last_update = time.time()
                     last_status = status
                 self.logger.debug(f"Order status check {quick_check + 1}: {status}")
 
-                if status == 'Filled':
+                if status == "Filled":
                     self.logger.info(f"Order {ib_trade.contract.symbol} filled immediately")
                     return self._create_trade_from_ib(ib_trade)
-                elif status in ['Cancelled', 'ApiCancelled', 'Inactive']:
-                    self.logger.warning(f"Order {ib_trade.contract.symbol} cancelled/inactive: {status}")
+                elif status in ["Cancelled", "ApiCancelled", "Inactive"]:
+                    self.logger.warning(
+                        f"Order {ib_trade.contract.symbol} cancelled/inactive: {status}"
+                    )
                     return None
 
         # If not immediately filled, do regular monitoring with timeout
@@ -755,10 +786,10 @@ class SmartOrderExecutor(BaseExecutor):
                 last_refresh = time.time()
 
             # Check order status
-            if hasattr(ib_trade.orderStatus, 'status'):
+            if hasattr(ib_trade.orderStatus, "status"):
                 status = ib_trade.orderStatus.status
-                filled = getattr(ib_trade.orderStatus, 'filled', 0)
-                remaining = getattr(ib_trade.orderStatus, 'remaining', 0)
+                filled = getattr(ib_trade.orderStatus, "filled", 0)
+                remaining = getattr(ib_trade.orderStatus, "remaining", 0)
 
                 if status != last_status:
                     last_update = time.time()
@@ -769,21 +800,26 @@ class SmartOrderExecutor(BaseExecutor):
                     f"filled={filled}, remaining={remaining}"
                 )
 
-                if status == 'Filled':
+                if status == "Filled":
                     self.logger.info(f"Order {ib_trade.contract.symbol} completed")
                     return self._create_trade_from_ib(ib_trade)
-                elif status in ['Cancelled', 'ApiCancelled', 'Inactive']:
+                elif status in ["Cancelled", "ApiCancelled", "Inactive"]:
                     self.logger.warning(f"Order {ib_trade.contract.symbol} cancelled: {status}")
                     return None
                 elif filled > 0 and remaining == 0:
                     # Sometimes status doesn't update but fill info does
-                    self.logger.info(f"Order {ib_trade.contract.symbol} detected as filled via fill count")
+                    self.logger.info(
+                        f"Order {ib_trade.contract.symbol} detected as filled via fill count"
+                    )
                     return self._create_trade_from_ib(ib_trade)
 
             # Check using isDone() as backup
             try:
                 if ib_trade.isDone():
-                    if hasattr(ib_trade.orderStatus, 'status') and ib_trade.orderStatus.status == 'Filled':
+                    if (
+                        hasattr(ib_trade.orderStatus, "status")
+                        and ib_trade.orderStatus.status == "Filled"
+                    ):
                         return self._create_trade_from_ib(ib_trade)
                     else:
                         self.logger.warning(f"Order {ib_trade.contract.symbol} done but not filled")
@@ -800,7 +836,7 @@ class SmartOrderExecutor(BaseExecutor):
 
     def _handle_partial_fill(self, smart_order: SmartOrder, ib_trade: IBTrade) -> bool:
         """Determine if partial fill is acceptable."""
-        if hasattr(ib_trade.orderStatus, 'filled'):
+        if hasattr(ib_trade.orderStatus, "filled"):
             filled_qty = ib_trade.orderStatus.filled
             fill_ratio = filled_qty / smart_order.base_order.quantity
 
@@ -813,15 +849,17 @@ class SmartOrderExecutor(BaseExecutor):
             else:
                 # Update remaining quantity for retry
                 smart_order.total_filled += filled_qty
-                smart_order.remaining_quantity = smart_order.base_order.quantity - smart_order.total_filled
+                smart_order.remaining_quantity = (
+                    smart_order.base_order.quantity - smart_order.total_filled
+                )
                 return False
 
         return False
 
     def _create_trade_from_partial(self, smart_order: SmartOrder, ib_trade: IBTrade) -> Trade:
         """Create trade object from partial fill."""
-        filled_qty = getattr(ib_trade.orderStatus, 'filled', 0)
-        avg_price = getattr(ib_trade.orderStatus, 'avgFillPrice', 0)
+        filled_qty = getattr(ib_trade.orderStatus, "filled", 0)
+        avg_price = getattr(ib_trade.orderStatus, "avgFillPrice", 0)
 
         return Trade(
             order_id=ib_trade.order.orderId,
@@ -831,33 +869,34 @@ class SmartOrderExecutor(BaseExecutor):
             fill_price=avg_price,
             commission=0,  # Commission would be calculated separately
             timestamp=datetime.now(),
-            status=OrderStatus.PARTIALLY_FILLED
+            status=OrderStatus.PARTIALLY_FILLED,
         )
-
 
     def _create_trade_from_ib(self, ib_trade: IBTrade) -> Trade:
         """Create trade object from completed IB trade - enhanced error handling."""
         try:
             # Get order details with fallback values
-            order_id = getattr(ib_trade.order, 'orderId', 0)
-            symbol = getattr(ib_trade.contract, 'symbol', 'UNKNOWN')
-            action_str = getattr(ib_trade.order, 'action', 'BUY')
+            order_id = getattr(ib_trade.order, "orderId", 0)
+            symbol = getattr(ib_trade.contract, "symbol", "UNKNOWN")
+            action_str = getattr(ib_trade.order, "action", "BUY")
 
             # Get fill details with validation
-            filled_qty = getattr(ib_trade.orderStatus, 'filled', 0)
-            avg_price = getattr(ib_trade.orderStatus, 'avgFillPrice', 0.0)
+            filled_qty = getattr(ib_trade.orderStatus, "filled", 0)
+            avg_price = getattr(ib_trade.orderStatus, "avgFillPrice", 0.0)
 
             # Validate fill data
             if filled_qty <= 0:
                 self.logger.warning(f"Invalid filled quantity for {symbol}: {filled_qty}")
-                filled_qty = getattr(ib_trade.order, 'totalQuantity', 0)
+                filled_qty = getattr(ib_trade.order, "totalQuantity", 0)
 
             if avg_price <= 0:
                 self.logger.warning(f"Invalid fill price for {symbol}: {avg_price}")
                 # Try to get a reasonable price estimate
                 try:
-                    ticker = self.ib.reqMktData(ib_trade.contract, '', False, False)
-                    wait(0.5, self.ib)
+
+                    ticker = self.ib.reqMktData(ib_trade.contract, "", False, False)
+                    self.ib.sleep(0.5)
+
                     if ticker.last and ticker.last > 0:
                         avg_price = ticker.last
                     elif ticker.close and ticker.close > 0:
@@ -869,22 +908,24 @@ class SmartOrderExecutor(BaseExecutor):
 
             # Determine order status
             status = OrderStatus.FILLED
-            if hasattr(ib_trade.orderStatus, 'status'):
-                if ib_trade.orderStatus.status == 'PartiallyFilled':
+            if hasattr(ib_trade.orderStatus, "status"):
+                if ib_trade.orderStatus.status == "PartiallyFilled":
                     status = OrderStatus.PARTIALLY_FILLED
 
             trade = Trade(
                 order_id=order_id,
                 symbol=symbol,
-                action=OrderAction.BUY if action_str == 'BUY' else OrderAction.SELL,
+                action=OrderAction.BUY if action_str == "BUY" else OrderAction.SELL,
                 quantity=int(filled_qty),
                 fill_price=float(avg_price),
                 commission=0,  # Would be updated from execution reports
                 timestamp=datetime.now(),
-                status=status
+                status=status,
             )
 
-            self.logger.debug(f"Created trade: {symbol} {action_str} {filled_qty} @ ${avg_price:.2f}")
+            self.logger.debug(
+                f"Created trade: {symbol} {action_str} {filled_qty} @ ${avg_price:.2f}"
+            )
             return trade
 
         except Exception as e:
@@ -898,6 +939,5 @@ class SmartOrderExecutor(BaseExecutor):
                 fill_price=0.0,
                 commission=0,
                 timestamp=datetime.now(),
-                status=OrderStatus.FILLED
+                status=OrderStatus.FILLED,
             )
-
