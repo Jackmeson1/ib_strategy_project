@@ -28,6 +28,7 @@ This tool manages leveraged portfolios with:
 - **--hanging-protection**: 5-layer timeout and retry protection
 - **--atomic-margin**: Validate entire batch before execution
 - **Thread-Pool Monitoring**: No hanging on individual order fills
+- **SmartOrderExecutor**: Executes orders in parallel batches with retry logic
 
 ### 🛡️ Safety Systems
 - **Margin Safety Cushion**: Configurable buffer (default 20%)
@@ -276,6 +277,7 @@ python main.py --batch-execution --smart-orders --hanging-protection --atomic-ma
 - `src/strategy/fixed_leverage.py` - Standard fixed leverage strategy
 - `src/strategy/enhanced_fixed_leverage.py` - Advanced batch execution strategy
 - `src/execution/batch_executor.py` - True parallel batch execution
+- `src/execution/smart_executor.py` - Adaptive order executor with parallel batching and retry logic
 - `src/portfolio/manager.py` - Portfolio management with safety checks
 - `src/config/portfolio.py` - Default portfolio weights
 
