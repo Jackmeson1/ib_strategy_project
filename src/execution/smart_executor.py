@@ -23,11 +23,7 @@ from ib_insync import Trade as IBTrade
 from src.config.settings import Config
 from src.core.types import ExecutionResult, Order, OrderAction, OrderStatus, RebalanceRequest, Trade
 from src.portfolio.manager import PortfolioManager
-
-
-from src.utils.logger import get_logger
 from src.utils.delay import wait
-
 
 from .base_executor import BaseExecutor
 
@@ -115,6 +111,10 @@ class SmartOrderExecutor(BaseExecutor):
         # Order management
         self.active_orders: Dict[str, SmartOrder] = {}
         self.execution_lock = threading.Lock()
+
+        # Register disconnect handler
+        if hasattr(self.ib, "disconnectedEvent"):
+            self.ib.disconnectedEvent += self._on_ib_disconnect
 
     def execute_rebalance(self, request: RebalanceRequest) -> ExecutionResult:
         """
@@ -225,11 +225,9 @@ class SmartOrderExecutor(BaseExecutor):
                     contract = self.contracts.get(symbol)
                     if contract:
 
-                        ticker = self.ib.reqMktData(contract, '', False, False)
+                        ticker = self.ib.reqMktData(contract, "", False, False)
 
                         wait(1, self.ib)  # Wait for price
-                        
-
 
                         current_price = None
                         if ticker.last and ticker.last > 0:
@@ -331,7 +329,7 @@ class SmartOrderExecutor(BaseExecutor):
 
             # Get market data
 
-            ticker = self.ib.reqMktData(contract, '', False, False)
+            ticker = self.ib.reqMktData(contract, "", False, False)
 
             wait(0.5, self.ib)
 
@@ -365,7 +363,7 @@ class SmartOrderExecutor(BaseExecutor):
             )
 
         # Create smart orders
-        for symbol, qty_diff, current_price, required in order_requirements:
+        for symbol, qty_diff, current_price, _required in order_requirements:
             # Apply scaling
             scaled_qty = int(qty_diff * scaling_factor) if qty_diff > 0 else qty_diff
 
@@ -464,11 +462,7 @@ class SmartOrderExecutor(BaseExecutor):
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
 
-
                 wait(2, self.ib)
-
-            
-
 
             # Monitor leverage after each batch
             try:
@@ -600,7 +594,9 @@ class SmartOrderExecutor(BaseExecutor):
                     try:
                         self.ib.cancelOrder(current_ib_trade.order)
 
-                        self.logger.info(f"Cancelled previous order for {smart_order.base_order.symbol}")
+                        self.logger.info(
+                            f"Cancelled previous order for {smart_order.base_order.symbol}"
+                        )
                         wait(0.5, self.ib)  # Brief pause after cancellation
 
                     except Exception as e:
@@ -899,9 +895,11 @@ class SmartOrderExecutor(BaseExecutor):
 
             # Determine order status
             status = OrderStatus.FILLED
-            if hasattr(ib_trade.orderStatus, "status"):
-                if ib_trade.orderStatus.status == "PartiallyFilled":
-                    status = OrderStatus.PARTIALLY_FILLED
+            if (
+                hasattr(ib_trade.orderStatus, "status")
+                and ib_trade.orderStatus.status == "PartiallyFilled"
+            ):
+                status = OrderStatus.PARTIALLY_FILLED
 
             trade = Trade(
                 order_id=order_id,
@@ -932,3 +930,18 @@ class SmartOrderExecutor(BaseExecutor):
                 timestamp=datetime.now(),
                 status=OrderStatus.FILLED,
             )
+
+    def _on_ib_disconnect(self):
+        """Cancel outstanding smart orders on disconnect."""
+        self.logger.warning("IB disconnected - cancelling active smart orders")
+        with self.execution_lock:
+            for smart_order in list(self.active_orders.values()):
+                for ib_trade in smart_order.ib_trades:
+                    try:
+                        self.ib.cancelOrder(ib_trade.order)
+                    except Exception as exc:  # pragma: no cover - defensive
+                        self.logger.warning(
+                            f"Failed to cancel order {ib_trade.order.orderId}: {exc}"
+                        )
+                smart_order.retry_count = smart_order.max_retries + 1
+            self.active_orders.clear()
