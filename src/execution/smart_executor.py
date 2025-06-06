@@ -416,11 +416,15 @@ class SmartOrderExecutor:
             return OrderPriority.LOW
     
     def _execute_smart_batches(
-        self, 
+        self,
         smart_orders: List[SmartOrder],
         target_leverage: float
     ) -> ExecutionResult:
-        """Execute smart orders in optimized batches with parallel processing."""
+        """Execute smart orders in optimized batches with parallel processing.
+
+        Each batch uses :func:`_execute_parallel_batch`, which places multiple
+        orders concurrently using a thread pool limited by ``max_parallel_orders``.
+        """
         start_time = time.time()
         all_trades = []
         all_failed = []
@@ -475,72 +479,62 @@ class SmartOrderExecutor:
         )
     
     def _execute_parallel_batch(self, smart_orders: List[SmartOrder]) -> ExecutionResult:
-        """Execute a batch of orders sequentially with smart retry logic and timeout protection."""
+        """Execute a batch of orders concurrently using a thread pool.
+
+        Orders are submitted to a :class:`ThreadPoolExecutor` with at most
+        ``self.max_parallel_orders`` workers so that multiple orders can be
+        placed in parallel while avoiding excessive concurrency on the IB
+        connection.
+        """
+
         start_time = time.time()
-        trades = []
-        failed = []
-        errors = []
+        trades: List[Trade] = []
+        failed: List[Order] = []
+        errors: List[str] = []
         commission = 0
-        
-        # Calculate total batch timeout (based on individual order timeouts)
+
         max_order_timeout = max(order.timeout_seconds for order in smart_orders)
-        batch_timeout = len(smart_orders) * max_order_timeout + 60  # Extra 60s buffer
-        
-        self.logger.info(f"Starting batch execution with {len(smart_orders)} orders (timeout: {batch_timeout}s)")
-        
-        # Execute orders sequentially to avoid threading issues with IB connection
-        for order_idx, order in enumerate(smart_orders):
-            order_start_time = time.time()
-            
-            # Check if batch timeout is approaching
-            elapsed = time.time() - start_time
-            if elapsed > batch_timeout:
-                self.logger.error(f"Batch timeout reached ({batch_timeout}s), aborting remaining orders")
-                for remaining_order in smart_orders[order_idx:]:
-                    failed.append(remaining_order.base_order)
-                    errors.append(f"Batch timeout: {remaining_order.base_order.symbol}")
-                break
-            
-            try:
-                self.logger.info(
-                    f"Executing order {order_idx + 1}/{len(smart_orders)}: {order.base_order.symbol} "
-                    f"(batch elapsed: {elapsed:.1f}s)"
-                )
-                
-                # Execute single order with timeout protection
-                result = self._execute_single_smart_order_with_timeout(order, max_order_timeout)
-                
-                if result:
-                    trades.append(result)
-                    order_time = time.time() - order_start_time
-                    self.logger.info(f"Successfully executed {order.base_order.symbol} in {order_time:.1f}s")
-                else:
+
+        self.logger.info(
+            f"Starting parallel batch with {len(smart_orders)} orders"
+        )
+
+        with ThreadPoolExecutor(max_workers=min(len(smart_orders), self.max_parallel_orders)) as executor:
+            future_map = {
+                executor.submit(
+                    self._execute_single_smart_order_with_timeout,
+                    order,
+                    max_order_timeout,
+                ): order
+                for order in smart_orders
+            }
+
+            for future in as_completed(future_map):
+                order = future_map[future]
+                try:
+                    result = future.result()
+                    if result:
+                        trades.append(result)
+                    else:
+                        failed.append(order.base_order)
+                        errors.append(f"Failed to execute {order.base_order.symbol}")
+                except Exception as e:  # pragma: no cover - defensive
+                    self.logger.error(f"Error executing {order.base_order.symbol}: {e}")
                     failed.append(order.base_order)
-                    errors.append(f"Failed to execute {order.base_order.symbol}")
-                    self.logger.warning(f"Failed to execute {order.base_order.symbol}")
-                    
-            except Exception as e:
-                self.logger.error(f"Error executing {order.base_order.symbol}: {e}")
-                failed.append(order.base_order)
-                errors.append(f"{order.base_order.symbol}: {str(e)}")
-            
-            # Brief pause between orders to avoid overwhelming the system
-            if order_idx < len(smart_orders) - 1:
-                time.sleep(0.5)
-        
+                    errors.append(f"{order.base_order.symbol}: {str(e)}")
+
         batch_time = time.time() - start_time
         self.logger.info(
-            f"Batch execution completed in {batch_time:.1f}s: "
-            f"Success: {len(trades)}, Failed: {len(failed)}"
+            f"Parallel batch completed in {batch_time:.1f}s: Success: {len(trades)}, Failed: {len(failed)}"
         )
-        
+
         return ExecutionResult(
             success=len(failed) == 0,
             orders_placed=trades,
             orders_failed=failed,
             total_commission=commission,
             execution_time=batch_time,
-            errors=errors
+            errors=errors,
         )
     
     def _execute_single_smart_order_with_timeout(self, smart_order: SmartOrder, max_timeout: int) -> Optional[Trade]:
