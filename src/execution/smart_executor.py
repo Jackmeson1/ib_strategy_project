@@ -24,6 +24,7 @@ from src.core.types import (
 )
 from src.portfolio.manager import PortfolioManager
 from src.utils.logger import get_logger
+from src.utils.delay import wait
 
 
 class OrderType(Enum):
@@ -214,7 +215,7 @@ class SmartOrderExecutor:
                     contract = self.contracts.get(symbol)
                     if contract:
                         ticker = self.ib.reqMktData(contract, '', False, False)
-                        self.ib.sleep(1)  # Wait for price
+                        wait(1, self.ib)  # Wait for price
                         
                         current_price = None
                         if ticker.last and ticker.last > 0:
@@ -316,7 +317,7 @@ class SmartOrderExecutor:
             
             # Get market data
             ticker = self.ib.reqMktData(contract, '', False, False)
-            self.ib.sleep(0.5)
+            wait(0.5, self.ib)
             
             current_price = None
             if ticker.last and ticker.last > 0:
@@ -453,7 +454,7 @@ class SmartOrderExecutor:
             
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
-                time.sleep(2)
+                wait(2, self.ib)
             
             # Monitor leverage after each batch
             try:
@@ -580,7 +581,7 @@ class SmartOrderExecutor:
                     try:
                         self.ib.cancelOrder(current_ib_trade.order)
                         self.logger.info(f"Cancelled previous order for {smart_order.base_order.symbol}")
-                        time.sleep(0.5)  # Brief pause after cancellation
+                        wait(0.5, self.ib)  # Brief pause after cancellation
                     except Exception as e:
                         self.logger.warning(f"Failed to cancel previous order: {e}")
                 
@@ -623,12 +624,12 @@ class SmartOrderExecutor:
                         try:
                             if current_ib_trade:
                                 self.ib.cancelOrder(current_ib_trade.order)
-                                time.sleep(1)  # Wait for cancellation
+                                wait(1, self.ib)  # Wait for cancellation
                         except Exception as e:
                             self.logger.warning(f"Failed to cancel timed-out order: {e}")
                         
                         order_placed = False
-                        time.sleep(2)  # Brief pause before retry
+                        wait(2, self.ib)  # Brief pause before retry
                         continue
                     else:
                         self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol}")
@@ -648,7 +649,7 @@ class SmartOrderExecutor:
                 
                 if smart_order.retry_count <= smart_order.max_retries:
                     order_placed = False
-                    time.sleep(3)  # Longer pause on error
+                    wait(3, self.ib)  # Longer pause on error
                     continue
                 else:
                     self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol} after error")
@@ -690,7 +691,7 @@ class SmartOrderExecutor:
         
         # First, do a few quick checks for immediate fills (market orders)
         for quick_check in range(max_immediate_checks):
-            self.ib.sleep(0.1)  # Very brief pause
+            wait(0.1, self.ib)  # Very brief pause
             
             # Refresh order status
             self.ib.reqIds(-1)  # Refresh connection
@@ -709,7 +710,7 @@ class SmartOrderExecutor:
         
         # If not immediately filled, do regular monitoring with timeout
         while time.time() - start_time < timeout_seconds:
-            self.ib.sleep(check_interval)
+            wait(check_interval, self.ib)
             
             # Refresh order status periodically
             if int(time.time() - start_time) % 5 == 0:  # Every 5 seconds
@@ -813,7 +814,7 @@ class SmartOrderExecutor:
                 # Try to get a reasonable price estimate
                 try:
                     ticker = self.ib.reqMktData(ib_trade.contract, '', False, False)
-                    self.ib.sleep(0.5)
+                    wait(0.5, self.ib)
                     if ticker.last and ticker.last > 0:
                         avg_price = ticker.last
                     elif ticker.close and ticker.close > 0:

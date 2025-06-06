@@ -12,6 +12,7 @@ from ib_insync import IB, Contract, Forex, Stock, MarketOrder
 from src.core.exceptions import MarketDataError, TemporaryError
 from src.core.types import MarketData
 from src.utils.logger import get_logger
+from src.utils.delay import wait
 
 
 class MarketDataManager:
@@ -75,7 +76,7 @@ class MarketDataManager:
             timeout = 10
             
             while time.time() - start_time < timeout:
-                self.ib.sleep(0.5)
+                wait(0.5, self.ib)
                 
                 # Try midpoint first
                 if ticker.midpoint() and ticker.midpoint() > 0:
@@ -135,7 +136,7 @@ class MarketDataManager:
             start_time = time.time()
             
             while time.time() - start_time < timeout:
-                self.ib.sleep(0.5)
+                wait(0.5, self.ib)
                 
                 market_data = MarketData(
                     symbol=symbol,
@@ -192,7 +193,7 @@ class MarketDataManager:
                 tickers.append((contract.symbol, ticker))
             
             # Wait for data
-            self.ib.sleep(2)
+            wait(2, self.ib)
             
             # Collect prices
             for symbol, ticker in tickers:
