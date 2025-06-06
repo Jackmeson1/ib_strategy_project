@@ -181,7 +181,14 @@ def print_portfolio_summary(strategy, enhanced=False):
         print("=" * 80)
 
 
-def create_strategy(ib, config, portfolio_weights, target_leverage, strategy_type="fixed"):
+def create_strategy(
+    ib,
+    config,
+    portfolio_weights,
+    target_leverage,
+    strategy_type="fixed",
+    batch_execution: bool = False,
+):
     """Create strategy based on type selection."""
     if strategy_type == "enhanced":
         try:
@@ -191,7 +198,8 @@ def create_strategy(ib, config, portfolio_weights, target_leverage, strategy_typ
                 ib=ib,
                 config=config,
                 portfolio_weights=portfolio_weights,
-                target_leverage=target_leverage
+                target_leverage=target_leverage,
+                batch_execution=batch_execution,
             )
         except Exception as e:
             print(f"⚠️  Enhanced strategy failed to initialize: {e}")
@@ -435,7 +443,8 @@ Examples:
                 config=config,
                 portfolio_weights=portfolio_weights,
                 target_leverage=args.leverage,
-                strategy_type=strategy_type
+                strategy_type=strategy_type,
+                batch_execution=args.batch_execution,
             )
             
             # Configure enhanced features if available
