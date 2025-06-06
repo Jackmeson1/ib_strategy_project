@@ -7,8 +7,15 @@ from typing import Dict, Optional
 from ib_insync import IB
 
 from src.config.settings import Config
-from src.core.types import PortfolioWeights, RebalanceRequest
+from src.core.types import (
+    PortfolioWeights,
+    RebalanceRequest,
+    ExecutionResult,
+    Order,
+    OrderAction,
+)
 from src.execution.smart_executor import SmartOrderExecutor
+from src.execution.batch_executor import BatchOrderExecutor
 from src.strategy.fixed_leverage import FixedLeverageStrategy
 from src.utils.logger import get_logger
 
@@ -28,21 +35,35 @@ class EnhancedFixedLeverageStrategy(FixedLeverageStrategy):
         ib: IB,
         config: Config,
         portfolio_weights: Optional[PortfolioWeights] = None,
-        target_leverage: float = 1.4
+        target_leverage: float = 1.4,
+        batch_execution: bool = False,
     ):
         # Initialize parent class
         super().__init__(ib, config, portfolio_weights, target_leverage)
         
-        # Override executor with smart executor
-        self.smart_executor = SmartOrderExecutor(
-            ib=self.ib,
-            portfolio_manager=self.portfolio_manager,
-            config=self.config,
-            contracts=self.contracts
-        )
-        
         self.logger = get_logger(__name__)
-        self.logger.info("Enhanced Fixed Leverage Strategy initialized with Smart Executor")
+
+        # Choose execution engine based on batch_execution flag
+        if batch_execution:
+            self.smart_executor = BatchOrderExecutor(
+                ib=self.ib,
+                portfolio_manager=self.portfolio_manager,
+                config=self.config,
+                contracts=self.contracts,
+            )
+            self.logger.info(
+                "Enhanced Fixed Leverage Strategy initialized with Batch Executor"
+            )
+        else:
+            self.smart_executor = SmartOrderExecutor(
+                ib=self.ib,
+                portfolio_manager=self.portfolio_manager,
+                config=self.config,
+                contracts=self.contracts,
+            )
+            self.logger.info(
+                "Enhanced Fixed Leverage Strategy initialized with Smart Executor"
+            )
     
     def rebalance(self, force: bool = False) -> bool:
         """
@@ -86,16 +107,32 @@ class EnhancedFixedLeverageStrategy(FixedLeverageStrategy):
             # Calculate target positions
             target_positions = self.calculate_target_positions()
             
-            # Execute rebalance with smart executor
-            rebalance_request = RebalanceRequest(
-                target_positions=target_positions,
-                target_leverage=self.target_leverage,
-                reason="Enhanced manual rebalancing with smart execution",
-                dry_run=self.config.dry_run
-            )
-            
-            self.logger.info("Executing rebalance with Smart Order Executor")
-            result = self.smart_executor.execute_rebalance(rebalance_request)
+            # Execute rebalance using selected executor
+            if isinstance(self.smart_executor, BatchOrderExecutor):
+                self.logger.info("Executing rebalance with Batch Order Executor")
+                orders = self._calculate_orders(target_positions)
+                if self.config.dry_run:
+                    self.logger.info("DRY RUN: Batch orders would be executed")
+                    result = ExecutionResult(
+                        success=True,
+                        orders_placed=[],
+                        orders_failed=[],
+                        total_commission=0,
+                        execution_time=0,
+                        errors=[],
+                    )
+                else:
+                    result = self.smart_executor.execute_batch(orders)
+            else:
+                rebalance_request = RebalanceRequest(
+                    target_positions=target_positions,
+                    target_leverage=self.target_leverage,
+                    reason="Enhanced manual rebalancing with smart execution",
+                    dry_run=self.config.dry_run,
+                )
+
+                self.logger.info("Executing rebalance with Smart Order Executor")
+                result = self.smart_executor.execute_rebalance(rebalance_request)
             
             if result.success:
                 self.logger.info(
@@ -161,12 +198,32 @@ class EnhancedFixedLeverageStrategy(FixedLeverageStrategy):
         except Exception as e:
             self.logger.error(f"Failed to log execution details: {e}")
 
+    def _calculate_orders(self, target_positions: Dict[str, int]):
+        """Calculate simple Order list for batch execution."""
+        orders = []
+        current_positions = self.portfolio_manager.get_positions()
+
+        for symbol, target_qty in target_positions.items():
+            current_qty = (
+                current_positions.get(symbol, type("obj", (object,), {"quantity": 0})).quantity
+            )
+            diff = target_qty - current_qty
+
+            if abs(diff) < 1:
+                continue
+
+            action = OrderAction.BUY if diff > 0 else OrderAction.SELL
+            orders.append(Order(symbol=symbol, action=action, quantity=abs(int(diff))))
+
+        return orders
+
 
 def create_enhanced_strategy(
     ib: IB,
     config: Config,
     portfolio_weights: Optional[PortfolioWeights] = None,
-    target_leverage: float = 1.4
+    target_leverage: float = 1.4,
+    batch_execution: bool = False,
 ) -> EnhancedFixedLeverageStrategy:
     """
     Factory function to create enhanced strategy.
@@ -184,5 +241,6 @@ def create_enhanced_strategy(
         ib=ib,
         config=config,
         portfolio_weights=portfolio_weights,
-        target_leverage=target_leverage
-    ) 
+        target_leverage=target_leverage,
+        batch_execution=batch_execution,
+    )

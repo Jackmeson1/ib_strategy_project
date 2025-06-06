@@ -182,7 +182,14 @@ def print_portfolio_summary(strategy, enhanced=False):
         print("=" * 80)
 
 
-def create_strategy(ib, config, portfolio_weights, target_leverage, strategy_type="fixed"):
+def create_strategy(
+    ib,
+    config,
+    portfolio_weights,
+    target_leverage,
+    strategy_type="fixed",
+    batch_execution: bool = False,
+):
     """Create strategy based on type selection."""
     if strategy_type == "enhanced":
         try:
@@ -192,7 +199,8 @@ def create_strategy(ib, config, portfolio_weights, target_leverage, strategy_typ
                 ib=ib,
                 config=config,
                 portfolio_weights=portfolio_weights,
-                target_leverage=target_leverage
+                target_leverage=target_leverage,
+                batch_execution=batch_execution,
             )
         except Exception as e:
             print(f"⚠️  Enhanced strategy failed to initialize: {e}")
@@ -227,8 +235,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Execution Modes:
-  Standard (default): Sequential order processing, market orders, basic safety
-  Batch: Parallel order processing, smart order types, enhanced safety
+  Standard (default)          : Sequential three-batch processing
+  Smart (--smart-orders etc.) : Parallel batches via SmartOrderExecutor
+  Batch (--batch-execution)   : Fire-all then monitor with thread pools
 
 Key Features:
   --batch-execution    : Process all orders in parallel (faster, production-grade)
@@ -436,7 +445,8 @@ Examples:
                 config=config,
                 portfolio_weights=portfolio_weights,
                 target_leverage=args.leverage,
-                strategy_type=strategy_type
+                strategy_type=strategy_type,
+                batch_execution=args.batch_execution,
             )
             
             # Configure enhanced features if available
