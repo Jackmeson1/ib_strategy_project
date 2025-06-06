@@ -63,7 +63,9 @@ cp config/env.example .env
 # Edit .env with your IB credentials and settings
 ```
 
+
 To load a different file, pass `--env-file my.env` (or use `docker run --env-file my.env`).
+
 
 ### Windows Batch Example
 Create a simple batch script for quick setup and execution:
@@ -72,6 +74,7 @@ Create a simple batch script for quick setup and execution:
 @echo off
 call venv\Scripts\activate.bat
 python main.py --batch-execution
+
 ```
 
 ## Configuration
