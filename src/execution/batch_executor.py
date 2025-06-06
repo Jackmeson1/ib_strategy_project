@@ -383,7 +383,7 @@ class BatchOrderExecutor(BaseExecutor):
                 if trade.isDone():
                     self.logger.info(f"⚡ Immediate fill detected for {symbol}")
 
-                    return self._validate_fill(trade)
+                    return self._validate_fill(trade, self.min_fill_ratio)
 
                 # Keep event loop alive during quick checks
                 self.ib.sleep(0.1)
@@ -474,12 +474,14 @@ class BatchOrderExecutor(BaseExecutor):
                 original_order = next((o for o in original_orders if o.symbol == symbol), None)
                 if original_order:
                     trade_obj = Trade(
+                        order_id=trade.order.orderId,
                         symbol=symbol,
                         action=original_order.action,
                         quantity=trade.orderStatus.filled,
-                        price=trade.orderStatus.avgFillPrice or 0,
+                        fill_price=trade.orderStatus.avgFillPrice or 0,
                         commission=trade.commissionReport.commission if trade.commissionReport else 0,
-                        timestamp=datetime.now()
+                        timestamp=datetime.now(),
+                        status=OrderStatus.FILLED,
                     )
                     successful_trades.append(trade_obj)
                     
@@ -514,7 +516,7 @@ class BatchOrderExecutor(BaseExecutor):
         
         if self._executor:
             try:
-                self._executor.shutdown(wait=True, timeout=5)
+                self._executor.shutdown(wait=True)
             except Exception as e:
                 self.logger.warning(f"Cleanup warning: {e}")
         

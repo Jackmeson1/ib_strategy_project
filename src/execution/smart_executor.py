@@ -1,20 +1,11 @@
+
 """Smart Order Executor with enhanced order management, margin control and
 parallel batch execution.
 
 This executor runs orders in small batches using a thread pool so multiple
-orders can be processed concurrently.  It includes extensive retry logic,
+orders can be processed concurrently. It includes extensive retry logic,
 margin checks and partial fill handling to address production-level issues
 seen with simple market orders.
-"""
-
-
-=======
-Smart Order Executor with enhanced order management, margin control and retry
-logic.
-
-This executor runs orders in prioritized batches. Each batch executes
-concurrently using a small thread pool to avoid hanging while containing risk.
-For full fire-all-then-monitor behaviour see :class:`BatchOrderExecutor`.
 """
 
 import signal
