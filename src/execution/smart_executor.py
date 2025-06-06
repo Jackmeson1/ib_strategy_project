@@ -445,7 +445,10 @@ class SmartOrderExecutor:
 
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
-                time.sleep(2)
+
+                # Use IB.sleep so the event loop remains active during pauses
+                self.ib.sleep(2)
+            
 
             # Monitor leverage after each batch
             try:
@@ -571,8 +574,11 @@ class SmartOrderExecutor:
                 if current_ib_trade and not order_placed:
                     try:
                         self.ib.cancelOrder(current_ib_trade.order)
-                        self.logger.info(f"Cancelled previous order for {smart_order.base_order.symbol}")
-                        time.sleep(0.5)  # Brief pause after cancellation
+                        self.logger.info(
+                            f"Cancelled previous order for {smart_order.base_order.symbol}"
+                        )
+                        # Keep event loop responsive while waiting
+                        self.ib.sleep(0.5)
                     except Exception as e:
                         self.logger.warning(f"Failed to cancel previous order: {e}")
 
@@ -615,12 +621,14 @@ class SmartOrderExecutor:
                         try:
                             if current_ib_trade:
                                 self.ib.cancelOrder(current_ib_trade.order)
-                                time.sleep(1)  # Wait for cancellation
+                                # Allow IB event loop to process cancellation
+                                self.ib.sleep(1)
                         except Exception as e:
                             self.logger.warning(f"Failed to cancel timed-out order: {e}")
 
                         order_placed = False
-                        time.sleep(2)  # Brief pause before retry
+                        # Short pause before retry while keeping IB responsive
+                        self.ib.sleep(2)
                         continue
                     else:
                         self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol}")
@@ -640,7 +648,8 @@ class SmartOrderExecutor:
 
                 if smart_order.retry_count <= smart_order.max_retries:
                     order_placed = False
-                    time.sleep(3)  # Longer pause on error
+                    # Give IB time after error before retrying
+                    self.ib.sleep(3)
                     continue
                 else:
                     self.logger.error(f"Max retries exceeded for {smart_order.base_order.symbol} after error")
