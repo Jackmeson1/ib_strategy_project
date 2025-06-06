@@ -24,6 +24,7 @@ from src.core.types import PortfolioWeight, PortfolioWeights
 from src.strategy.fixed_leverage import FixedLeverageStrategy
 from src.utils.logger import setup_logger
 from src.utils.notifications import TelegramNotifier
+from src.utils.delay import wait
 
 
 # Global watchdog variables
@@ -42,7 +43,7 @@ def setup_watchdog(max_runtime_seconds: int):
     
     def watchdog_timer():
         """Watchdog thread that kills the process if it runs too long."""
-        time.sleep(max_runtime_seconds)
+        wait(max_runtime_seconds)
         if WATCHDOG_ACTIVE:
             print(f"\n🚨 WATCHDOG TIMEOUT: Process exceeded {max_runtime_seconds}s runtime limit!")
             print("🚨 Forcing exit to prevent capital sitting idle...")
@@ -234,8 +235,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Execution Modes:
-  Standard (default): Sequential order processing, market orders, basic safety
-  Batch: Parallel order processing, smart order types, enhanced safety
+  Standard (default)          : Sequential three-batch processing
+  Smart (--smart-orders etc.) : Parallel batches via SmartOrderExecutor
+  Batch (--batch-execution)   : Fire-all then monitor with thread pools
 
 Key Features:
   --batch-execution    : Process all orders in parallel (faster, production-grade)

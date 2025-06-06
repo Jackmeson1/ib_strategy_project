@@ -20,6 +20,7 @@ from src.core.types import (
 )
 from src.data.market_data import MarketDataManager
 from src.utils.logger import get_logger
+from src.utils.delay import wait
 
 
 class PortfolioManager:
@@ -380,7 +381,7 @@ class PortfolioManager:
                     # Wait for fill with shorter timeout
                     filled = False
                     for _ in range(30):  # 30 second timeout
-                        self.ib.sleep(1)
+                        wait(1, self.ib)
                         if trade.isDone():
                             filled = True
                             break

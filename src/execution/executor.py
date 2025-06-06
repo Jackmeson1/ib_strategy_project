@@ -17,6 +17,10 @@ from src.core.types import (
     RebalanceRequest, Trade
 )
 from src.portfolio.manager import PortfolioManager
+
+from src.utils.logger import get_logger
+from src.utils.delay import wait
+
 from .base_executor import BaseExecutor
 
 
@@ -174,7 +178,7 @@ class OrderExecutor(BaseExecutor):
             
             # Wait between batches
             if batch_idx < len(batches) - 1:
-                time.sleep(self.batch_delay)
+                wait(self.batch_delay, self.ib)
             
             # Check leverage after each batch
             try:
@@ -251,7 +255,7 @@ class OrderExecutor(BaseExecutor):
                             f"Retryable error for {order.symbol}, attempt {attempt + 1}/{self.max_retries}",
                             error=str(e)
                         )
-                        time.sleep(2 ** attempt)  # Exponential backoff
+                        wait(2 ** attempt, self.ib)  # Exponential backoff
                     else:
                         failed.append(order)
                         errors.append(f"{order.symbol}: {str(e)}")
@@ -291,7 +295,7 @@ class OrderExecutor(BaseExecutor):
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            self.ib.sleep(0.5)
+            wait(0.5, self.ib)
             
             if ib_trade.isDone():
                 # Order completed
