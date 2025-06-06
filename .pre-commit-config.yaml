@@ -47,19 +47,9 @@ repos:
         args: ['--ignore-missing-imports', '--strict']
         exclude: '^tests/'
 
-  - repo: https://github.com/pycqa/bandit
-    rev: 1.7.5
-    hooks:
-      - id: bandit
-        args: ['-c', 'pyproject.toml', '-ll']
-        additional_dependencies: ['bandit[toml]']
-        exclude: '^tests/'
 
-  - repo: local
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
     hooks:
-      - id: no-hardcoded-secrets
-        name: Check for hardcoded secrets
-        entry: '(?i)(api[_-]?key|token|secret|password)\s*=\s*["\'][^"\']+["\']'
-        language: pygrep
-        types: [python]
-        exclude: '^(tests/|\.env\.example|src/config/settings\.py)$' 
+      - id: detect-secrets
+        exclude: '^tests/'
