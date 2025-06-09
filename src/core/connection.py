@@ -55,6 +55,19 @@ class IBConnectionManager:
                     timeout=timeout,
                 )
 
+                accounts = self.ib.managedAccounts()
+                if not accounts:
+                    self.logger.critical(
+                        "Connected but no managed accounts returned",
+                        host=self.config.host,
+                        port=self.config.port,
+                        client_id=self.config.client_id,
+                    )
+                    self._cleanup()
+                    raise ConnectionError(
+                        "No managed accounts returned - possible competing session"
+                    )
+
                 connection_time = time.time() - start_time
                 self._is_connected = True
 
@@ -189,6 +202,19 @@ class AsyncIBConnectionManager(IBConnectionManager):
                     clientId=self.config.client_id,
                     timeout=timeout,
                 )
+
+                accounts = self.ib.managedAccounts()
+                if not accounts:
+                    self.logger.critical(
+                        "Connected but no managed accounts returned",
+                        host=self.config.host,
+                        port=self.config.port,
+                        client_id=self.config.client_id,
+                    )
+                    await self._cleanup_async()
+                    raise ConnectionError(
+                        "No managed accounts returned - possible competing session"
+                    )
 
                 self._is_connected = True
                 self._loop = asyncio.get_event_loop()

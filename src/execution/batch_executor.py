@@ -481,13 +481,12 @@ class BatchOrderExecutor(BaseExecutor):
                         symbol=symbol,
                         action=original_order.action,
                         quantity=trade.orderStatus.filled,
-
-                        price=trade.orderStatus.avgFillPrice or 0,
+                        fill_price=trade.orderStatus.avgFillPrice or 0,
                         commission=(
                             trade.commissionReport.commission if trade.commissionReport else 0
                         ),
                         timestamp=datetime.now(),
-
+                        status=OrderStatus.FILLED,
                     )
                     successful_trades.append(trade_obj)
 

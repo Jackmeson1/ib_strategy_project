@@ -85,3 +85,6 @@ class MockIBGateway:
 
     def isConnected(self) -> bool:
         return True
+
+    def managedAccounts(self) -> List[str]:  # pragma: no cover - simple list
+        return ["TEST"]
