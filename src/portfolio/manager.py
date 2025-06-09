@@ -383,6 +383,12 @@ class PortfolioManager:
                     continue
                 
                 try:
+                    contract = self.contracts.get(symbol)
+                    if not contract:
+                        contract = getattr(position, "ib_contract", None) or Stock(symbol, "SMART", "USD")
+                        self.ib.qualifyContracts(contract)
+                        self.contracts[symbol] = contract
+
                     # Create market order to close position
                     action = OrderAction.SELL if position.quantity > 0 else OrderAction.BUY
                     order = Order(
@@ -390,14 +396,14 @@ class PortfolioManager:
                         action=action,
                         quantity=abs(int(position.quantity))
                     )
-                    
+
                     # Place order
                     ib_order = MarketOrder(
                         action=order.action.value,
                         totalQuantity=order.quantity
                     )
-                    
-                    trade = self.ib.placeOrder(self.contracts[symbol], ib_order)
+
+                    trade = self.ib.placeOrder(contract, ib_order)
                     
                     # Wait for fill with shorter timeout
                     filled = False

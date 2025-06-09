@@ -72,3 +72,24 @@ def test_get_portfolio_leverage_zero_nlv(manager_instance):
     pm.get_account_summary = MagicMock(return_value={"GrossPositionValue": 0, "NetLiquidation": 0})
     md.get_fx_rate.return_value = 1
     assert pm.get_portfolio_leverage() == 0.0
+
+
+def test_emergency_liquidate_missing_contract(manager_instance):
+    pm, ib, _ = manager_instance
+
+    pm.contracts = {}
+    pm.get_positions = MagicMock(
+        return_value={"MSFT": Position(symbol="MSFT", quantity=5, avg_cost=10)}
+    )
+
+    trade = MagicMock()
+    trade.isDone.return_value = True
+    trade.order.orderId = 1
+    trade.orderStatus.avgFillPrice = 10
+    ib.placeOrder.return_value = trade
+
+    result = pm.emergency_liquidate_all()
+
+    ib.qualifyContracts.assert_called()
+    ib.placeOrder.assert_called_once()
+    assert result.success
