@@ -1,6 +1,8 @@
 # IB Portfolio Rebalancing Tool
 
-A production-ready portfolio rebalancing tool for Interactive Brokers with advanced batch execution, atomic margin checks, and comprehensive hanging protection.
+[![Build Status](https://img.shields.io/github/actions/workflow/status/example/ib-portfolio-manager/ci.yml?branch=main)](https://github.com/example/ib-portfolio-manager/actions) [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A concise portfolio manager for Interactive Brokers with atomic margin checks, true batch execution, and robust safety systems.
 
 ## 🆕 P0 Production Fixes (Latest)
 
@@ -20,7 +22,16 @@ This tool manages leveraged portfolios with:
 - **Comprehensive safety checks** and margin monitoring
 - **Telegram notifications** (optional)
 
-## Key Features
+## Why Choose This IB Portfolio Manager?
+
+- Designed for algorithmic trading with a single entrypoint.
+- True batch execution with fail-fast timeouts.
+- Atomic margin checks and safety cushions.
+- Environment isolation via `.env` and multi-account support.
+- Built-in monitoring through Telegram and JSON snapshots.
+
+
+## Key Features for Algorithmic Traders
 
 ### 🚀 Enhanced Execution Features
 - **--batch-execution**: Fire all orders simultaneously, monitor in parallel
