@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.types import OrderAction, Position
+from src.core.types import Position
 from src.portfolio.manager import PortfolioManager
 
 
@@ -67,6 +67,7 @@ def test_get_portfolio_leverage_conversion(manager_instance):
     leverage = pm.get_portfolio_leverage()
 
     assert leverage == 2.0
+
 
 def test_get_portfolio_leverage_zero_nlv(manager_instance):
     pm, _, md = manager_instance

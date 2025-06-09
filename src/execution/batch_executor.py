@@ -3,22 +3,18 @@ Enhanced batch order executor with atomic margin checks and fire-all-then-monito
 Addresses P0-A and P0-D: true batch execution with atomic margin validation.
 """
 
-import asyncio
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set, Tuple
+from datetime import datetime
+from typing import Dict, List
 
 from ib_insync import IB, Contract, LimitOrder, MarketOrder
 from ib_insync import Trade as IBTrade
 
 from src.config.settings import Config
-from src.core.exceptions import OrderExecutionError, RetryableError
 from src.core.types import ExecutionResult, Order, OrderAction, OrderStatus, Trade
 from src.portfolio.manager import PortfolioManager
 from src.utils.delay import wait
-from src.utils.logger import get_logger
 
 from .base_executor import BaseExecutor
 
@@ -149,7 +145,7 @@ class BatchOrderExecutor(BaseExecutor):
                         ticker = self.ib.reqMktData(contract, "", False, False)
 
                         # Keep IB event loop active while waiting for price
-                        self.ib.sleep(0.1)
+                        wait(0.1, self.ib)
 
                         price = ticker.marketPrice()
                         if price and price > 0:
@@ -256,7 +252,7 @@ class BatchOrderExecutor(BaseExecutor):
         ticker = self.ib.reqMktData(contract, "", False, False)
 
         # Allow the event loop to process data while waiting
-        self.ib.sleep(0.1)
+        wait(0.1, self.ib)
 
         market_price = ticker.marketPrice()
         order_value = market_price * order.quantity if market_price else 0
@@ -340,7 +336,6 @@ class BatchOrderExecutor(BaseExecutor):
 
                 # Check progress
                 elapsed_time = time.time() - start_time
-                remaining_orders = len(ib_trades) - completed_count - len(self.failed_orders)
 
                 if elapsed_time > self.batch_timeout:
                     self.logger.warning(
@@ -390,7 +385,7 @@ class BatchOrderExecutor(BaseExecutor):
                     return self._validate_fill(trade, self.min_fill_ratio)
 
                 # Keep event loop alive during quick checks
-                self.ib.sleep(0.1)
+                wait(0.1, self.ib)
 
             # Regular monitoring loop
             while time.time() - start_time < self.order_timeout and self._monitor_active:
@@ -412,12 +407,12 @@ class BatchOrderExecutor(BaseExecutor):
                             return True
 
                     # Brief sleep to prevent busy waiting while keeping IB responsive
-                    self.ib.sleep(0.5)
+                    wait(0.5, self.ib)
 
                 except Exception as e:
                     self.logger.warning(f"Monitoring error for {symbol}: {e}")
                     # Longer pause on errors without blocking event loop
-                    self.ib.sleep(1)
+                    wait(1, self.ib)
 
             # Timeout reached
             self.logger.warning(f"⏰ Order timeout for {symbol} after {self.order_timeout}s")
@@ -427,7 +422,7 @@ class BatchOrderExecutor(BaseExecutor):
                 self.ib.cancelOrder(trade.order)
 
                 # Give IB time to process cancellation
-                self.ib.sleep(1)
+                wait(1, self.ib)
 
                 # Check final fill status
                 if trade.orderStatus.filled > 0:
@@ -468,7 +463,7 @@ class BatchOrderExecutor(BaseExecutor):
         successful_trades = []
         failed_orders = []
 
-        for order_id, trade in self.completed_orders.items():
+        for _order_id, trade in self.completed_orders.items():
             try:
                 # Create Trade object
                 symbol = trade.contract.symbol
