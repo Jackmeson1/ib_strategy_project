@@ -23,6 +23,7 @@ def manager_instance():
     market_data = MagicMock()
     config = MagicMock()
     config.ib.account_id = "TEST"
+    config.accounts = []
     contracts = {"AAPL": MagicMock()}
     pm = PortfolioManager(ib, market_data, config, contracts)
     return pm, ib, market_data

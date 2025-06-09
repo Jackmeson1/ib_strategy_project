@@ -30,6 +30,9 @@ def test_connection_retry_backoff(monkeypatch):
             if len(attempts) < 3:
                 raise RuntimeError("fail")
 
+        def managedAccounts(self):
+            return ["TEST"]
+
         def isConnected(self):
             return True
 

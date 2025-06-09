@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from src.config.portfolio import get_default_portfolio
 from src.config.settings import load_config
 from src.core.connection import create_connection_manager
+from src.core.exceptions import ConnectionError
 from src.core.types import PortfolioWeight, PortfolioWeights
 from src.strategy.fixed_leverage import FixedLeverageStrategy
 from src.utils.delay import wait
@@ -514,6 +515,23 @@ Examples:
             print("Interrupted by user")
         disable_watchdog()
         return 0
+    except ConnectionError as e:
+        banner = "\n" + "!" * 60
+        banner += "\n⚠️  Connection error: Possible competing session detected\n"
+        banner += "!" * 60
+        print(banner)
+        if logger:
+            logger.error(f"Error: {e}", exc_info=True)
+        else:
+            print(f"Error: {e}")
+            import traceback
+
+            traceback.print_exc()
+        if telegram:
+            telegram.send_message(f"❌ Error during rebalancing: {str(e)}")
+
+        disable_watchdog()
+        return 2
     except Exception as e:
         if logger:
             logger.error(f"Error: {e}", exc_info=True)

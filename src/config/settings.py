@@ -40,7 +40,7 @@ class IBConfig:
 
     host: str = field(default_factory=lambda: os.getenv("IB_GATEWAY_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(os.getenv("IB_GATEWAY_PORT", "4002")))
-    client_id: int = field(default_factory=lambda: int(os.getenv("IB_CLIENT_ID", "1")))
+    client_id: int = field(default_factory=lambda: int(os.getenv("IB_CLIENT_ID", "0")))
     account_id: Optional[str] = field(default_factory=lambda: os.getenv("IB_ACCOUNT_ID"))
 
 

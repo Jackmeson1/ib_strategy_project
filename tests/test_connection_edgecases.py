@@ -65,3 +65,20 @@ def test_connect_success_and_disconnect(monkeypatch):
 
     manager.disconnect()
     fake_ib.disconnect.assert_called_once()
+
+
+def test_connect_managed_accounts_empty(monkeypatch):
+    fake_ib = MagicMock()
+    fake_ib.isConnected.return_value = True
+    fake_ib.connect.return_value = None
+    fake_ib.managedAccounts.return_value = []
+    fake_ib.disconnect.return_value = None
+    monkeypatch.setattr("src.core.connection.IB", lambda: fake_ib)
+
+    config = MagicMock(host="h", port=1, client_id=2, account_id="A")
+    manager = IBConnectionManager(config)
+
+    with pytest.raises(ConnectionError):
+        manager.connect()
+
+    assert fake_ib.managedAccounts.call_count >= 1
