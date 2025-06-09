@@ -320,6 +320,11 @@ python main.py --batch-execution --smart-orders --hanging-protection --atomic-ma
 - `src/portfolio/manager.py` - Portfolio management with safety checks
 - `src/config/portfolio.py` - Default portfolio weights
 
+## Documentation
+- [Interactive Brokers Setup](docs/INTERACTIVE_BROKERS_SETUP.md)
+- [Portfolio Rebalancing Strategies](docs/PORTFOLIO_REBALANCING_STRATEGIES.md)
+- [IB API Best Practices](docs/IB_API_BEST_PRACTICES.md)
+
 ## Risk Warnings
 
 ⚠️ **Important**:
