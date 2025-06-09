@@ -150,9 +150,10 @@ Before going live:
 ## Advanced Usage
 
 See [docs/](docs/) for:
-- [Interactive Brokers Setup Guide](docs/IB_SETUP.md)
-- [Advanced Configuration](docs/CONFIGURATION.md)
-- [API Reference](docs/API.md)
+- [Interactive Brokers Setup Guide](docs/INTERACTIVE_BROKERS_SETUP.md)
+- [IB API Best Practices](docs/IB_API_BEST_PRACTICES.md)
+- [Portfolio Rebalancing Strategies](docs/PORTFOLIO_REBALANCING_STRATEGIES.md)
+- [Migration Guide](docs/MIGRATION.md)
 
 ## Contributing
 
