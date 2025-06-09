@@ -23,6 +23,7 @@ def manager_instance():
     market_data = MagicMock()
     config = MagicMock()
     config.ib.account_id = "TEST"
+    config.accounts = []
     contracts = {"AAPL": MagicMock()}
     pm = PortfolioManager(ib, market_data, config, contracts)
     return pm, ib, market_data
@@ -66,6 +67,7 @@ def test_get_portfolio_leverage_conversion(manager_instance):
     leverage = pm.get_portfolio_leverage()
 
     assert leverage == 2.0
+
 
 def test_get_portfolio_leverage_zero_nlv(manager_instance):
     pm, _, md = manager_instance

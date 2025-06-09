@@ -1,10 +1,10 @@
 import time
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.types import Order, OrderAction, OrderStatus, Trade
+from src.core.types import Order, OrderAction
 from src.execution.batch_executor import BatchOrderExecutor
 
 
@@ -24,13 +24,13 @@ def make_ticker(price):
     return ticker
 
 
-def test_check_batch_margin_safety_insufficient_funds(simple_executor):
+def test_check_batch_margin_safety_insufficient_funds(simple_executor, monkeypatch):
     executor, ib, pm = simple_executor
     order = Order(symbol="AAPL", action=OrderAction.BUY, quantity=10)
     pm.get_account_summary.return_value = {"AvailableFunds": 1000, "NetLiquidation": 2000}
     pm.get_positions.return_value = {}
     ib.reqMktData.return_value = make_ticker(100)
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
 
     result = executor._check_batch_margin_safety([order])
 
@@ -38,10 +38,10 @@ def test_check_batch_margin_safety_insufficient_funds(simple_executor):
     ib.cancelMktData.assert_called_once_with(executor.contracts["AAPL"])
 
 
-def test_create_smart_order_types(simple_executor):
+def test_create_smart_order_types(simple_executor, monkeypatch):
     executor, ib, pm = simple_executor
     ib.reqMktData.return_value = make_ticker(200)
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
 
     small_order = Order(symbol="AAPL", action=OrderAction.BUY, quantity=10)
     big_order = Order(symbol="AAPL", action=OrderAction.SELL, quantity=100)
@@ -49,7 +49,7 @@ def test_create_smart_order_types(simple_executor):
     mo = executor._create_smart_order(small_order)
     lo = executor._create_smart_order(big_order)
 
-    from ib_insync import MarketOrder, LimitOrder
+    from ib_insync import LimitOrder, MarketOrder
 
     assert isinstance(mo, MarketOrder)
     assert isinstance(lo, LimitOrder)
@@ -91,6 +91,7 @@ def test_compile_results_builds_trades(simple_executor, monkeypatch):
     assert res.total_commission == 1.0
     assert "boom" in res.errors[0]
 
+
 def test_monitor_single_order_immediate_fill(simple_executor, monkeypatch):
     executor, ib, pm = simple_executor
     trade = MagicMock()
@@ -100,9 +101,29 @@ def test_monitor_single_order_immediate_fill(simple_executor, monkeypatch):
     trade.order.totalQuantity = 10
     trade.orderStatus.avgFillPrice = 100
     trade.isDone.return_value = True
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
     monkeypatch.setattr(executor, "_validate_fill", lambda *args, **kwargs: True)
     assert executor._monitor_single_order(trade)
+
+
+def test_monitor_single_order_threadpool(simple_executor, monkeypatch):
+    """Ensure _monitor_single_order runs in a thread without event loop errors."""
+    executor, ib, _ = simple_executor
+
+    trade = MagicMock()
+    trade.order.orderId = 1
+    trade.contract.symbol = "AAPL"
+    trade.orderStatus.filled = 10
+    trade.order.totalQuantity = 10
+    trade.orderStatus.avgFillPrice = 100
+    trade.isDone.return_value = True
+
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
+    monkeypatch.setattr(executor, "_validate_fill", lambda *args, **kwargs: True)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(executor._monitor_single_order, trade)
+        assert future.result()
 
 
 def test_cleanup_monitoring(simple_executor):
@@ -119,11 +140,12 @@ def test_cleanup_monitoring(simple_executor):
     assert executor.failed_orders == {}
     dummy_exec.shutdown.assert_called()
 
-def test_fire_all_orders_places_orders(simple_executor):
+
+def test_fire_all_orders_places_orders(simple_executor, monkeypatch):
     executor, ib, pm = simple_executor
     ib.placeOrder.return_value = MagicMock()
     ib.reqMktData.return_value = make_ticker(50)
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
     order = Order(symbol="AAPL", action=OrderAction.BUY, quantity=1)
     result = executor._fire_all_orders([order])
     assert len(result) == 1
@@ -156,14 +178,16 @@ def test_monitor_all_orders_success(simple_executor, monkeypatch):
 
     assert executor._monitor_all_orders([trade])
 
-def test_check_batch_margin_safety_success(simple_executor):
+
+def test_check_batch_margin_safety_success(simple_executor, monkeypatch):
     executor, ib, pm = simple_executor
     order = Order(symbol="AAPL", action=OrderAction.BUY, quantity=1)
     pm.get_account_summary.return_value = {"AvailableFunds": 100000, "NetLiquidation": 200000}
     pm.get_positions.return_value = {}
     ib.reqMktData.return_value = make_ticker(50)
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
     assert executor._check_batch_margin_safety([order])
+
 
 def test_monitor_single_order_partial_fill(simple_executor, monkeypatch):
     executor, ib, _ = simple_executor
@@ -174,6 +198,6 @@ def test_monitor_single_order_partial_fill(simple_executor, monkeypatch):
     trade.orderStatus.filled = 5
     trade.orderStatus.avgFillPrice = 50
     trade.isDone.side_effect = [False, False, True]
-    executor.ib.sleep = lambda *_: None
+    monkeypatch.setattr("src.utils.delay.wait", lambda *_: None)
     monkeypatch.setattr(executor, "_validate_fill", lambda *args, **kwargs: True)
     assert executor._monitor_single_order(trade)

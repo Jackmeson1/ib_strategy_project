@@ -1,4 +1,3 @@
-
 """Smart Order Executor with enhanced order management, margin control and
 parallel batch execution.
 
@@ -106,7 +105,6 @@ class SmartOrderExecutor(BaseExecutor):
         config: Config,
         contracts: Dict[str, Contract],
     ):
-
         super().__init__(ib, portfolio_manager, config, contracts)
 
         # Execution parameters
@@ -229,7 +227,6 @@ class SmartOrderExecutor(BaseExecutor):
                     # Get current market price
                     contract = self.contracts.get(symbol)
                     if contract:
-
                         ticker = self.ib.reqMktData(contract, "", False, False)
 
                         wait(1, self.ib)  # Wait for price
@@ -466,7 +463,6 @@ class SmartOrderExecutor(BaseExecutor):
 
             # Brief pause between batches
             if batch_idx < len(batches) - 1:
-
                 wait(2, self.ib)
 
             # Monitor leverage after each batch
@@ -733,8 +729,7 @@ class SmartOrderExecutor(BaseExecutor):
         stall_threshold = 10  # Time without status change before refresh
 
         for quick_check in range(max_immediate_checks):
-
-            self.ib.sleep(0.1)  # Very brief pause
+            wait(0.1, self.ib)  # Very brief pause
 
             # Refresh connection if no status update
             if (
@@ -764,8 +759,7 @@ class SmartOrderExecutor(BaseExecutor):
 
         # If not immediately filled, do regular monitoring with timeout
         while time.time() - start_time < timeout_seconds:
-
-            self.ib.sleep(check_interval)
+            wait(check_interval, self.ib)
 
             # Refresh connection if status hasn't changed
             if (
@@ -885,9 +879,8 @@ class SmartOrderExecutor(BaseExecutor):
                 self.logger.warning(f"Invalid fill price for {symbol}: {avg_price}")
                 # Try to get a reasonable price estimate
                 try:
-
                     ticker = self.ib.reqMktData(ib_trade.contract, "", False, False)
-                    self.ib.sleep(0.5)
+                    wait(0.5, self.ib)
 
                     if ticker.last and ticker.last > 0:
                         avg_price = ticker.last
