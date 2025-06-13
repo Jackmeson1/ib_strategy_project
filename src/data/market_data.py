@@ -132,40 +132,67 @@ class MarketDataManager:
                     return cached_data.last
         
         try:
-            ticker = self.ib.reqMktData(contract)
+            # Request market data with snapshot enabled for better data retrieval
+            ticker = self.ib.reqMktData(contract, '', True, False)
+            self.logger.debug(f"Requesting market data for {symbol}")
+            
             start_time = time.time()
             
             while time.time() - start_time < timeout:
-                wait(0.5, self.ib)
+                wait(0.1, self.ib)  # Shorter wait for more responsive checking
                 
-                market_data = MarketData(
-                    symbol=symbol,
-                    bid=ticker.bid,
-                    ask=ticker.ask,
-                    last=ticker.last,
-                    volume=ticker.volume,
-                    timestamp=datetime.now()
-                )
+                # Log current ticker state for debugging
+                self.logger.debug(f"{symbol}: bid={ticker.bid}, ask={ticker.ask}, last={ticker.last}, close={ticker.close}")
                 
-                # Try to get a valid price
-                if ticker.midpoint() and ticker.midpoint() > 0:
+                # Try multiple price sources in order of preference
+                price = None
+                price_type = None
+                
+                # 1. Try midpoint (bid+ask)/2
+                if ticker.bid and ticker.ask and ticker.bid > 0 and ticker.ask > 0:
+                    price = (ticker.bid + ticker.ask) / 2
+                    price_type = "midpoint"
+                
+                # 2. Try last trade price
+                elif ticker.last and ticker.last > 0:
+                    price = ticker.last
+                    price_type = "last"
+                
+                # 3. Try close price (previous day)
+                elif ticker.close and ticker.close > 0:
+                    price = ticker.close
+                    price_type = "close"
+                
+                # 4. Try market price function
+                elif ticker.marketPrice() and ticker.marketPrice() > 0:
+                    price = ticker.marketPrice()
+                    price_type = "market"
+                
+                if price and price > 0:
+                    market_data = MarketData(
+                        symbol=symbol,
+                        bid=ticker.bid,
+                        ask=ticker.ask,
+                        last=ticker.last,
+                        volume=ticker.volume,
+                        timestamp=datetime.now()
+                    )
+                    
                     self._price_cache[symbol] = market_data
-                    self.logger.debug(f"Price for {symbol}: {ticker.midpoint():.2f} (midpoint)")
-                    return ticker.midpoint()
-                
-                if ticker.marketPrice() and ticker.marketPrice() > 0:
-                    self._price_cache[symbol] = market_data
-                    self.logger.debug(f"Price for {symbol}: {ticker.marketPrice():.2f} (market)")
-                    return ticker.marketPrice()
-                
-                if ticker.last and ticker.last > 0:
-                    self._price_cache[symbol] = market_data
-                    self.logger.debug(f"Price for {symbol}: {ticker.last:.2f} (last)")
-                    return ticker.last
+                    self.logger.info(f"Price for {symbol}: ${price:.2f} ({price_type})")
+                    self.ib.cancelMktData(contract)  # Clean up subscription
+                    return price
             
-            raise MarketDataError(f"Unable to get price for {symbol} - market may be closed")
+            # Clean up even if no price found
+            self.ib.cancelMktData(contract)
+            raise MarketDataError(f"Unable to get price for {symbol} after {timeout}s timeout")
             
         except Exception as e:
+            # Make sure to clean up subscription on error
+            try:
+                self.ib.cancelMktData(contract)
+            except:
+                pass
             self.logger.error(f"Failed to get price for {symbol}: {e}")
             raise MarketDataError(f"Failed to get price for {symbol}: {e}")
     
@@ -182,33 +209,19 @@ class MarketDataManager:
         """
         prices = {}
         
-        # Process in batches to avoid overwhelming the API
-        for i in range(0, len(contracts), max_workers):
-            batch = contracts[i:i + max_workers]
-            tickers = []
-            
-            # Request market data for batch
-            for contract in batch:
-                ticker = self.ib.reqMktData(contract)
-                tickers.append((contract.symbol, ticker))
-            
-            # Wait for data
-            wait(2, self.ib)
-            
-            # Collect prices
-            for symbol, ticker in tickers:
-                try:
-                    if ticker.midpoint() and ticker.midpoint() > 0:
-                        prices[symbol] = ticker.midpoint()
-                    elif ticker.last and ticker.last > 0:
-                        prices[symbol] = ticker.last
-                    else:
-                        self.logger.warning(f"No valid price for {symbol}")
-                except Exception as e:
-                    self.logger.error(f"Error getting price for {symbol}: {e}")
-            
-            # Cancel market data subscriptions
-            for _, ticker in tickers:
-                self.ib.cancelMktData(ticker)
+        # Use individual requests for more reliable data retrieval
+        self.logger.info(f"Requesting prices for {len(contracts)} contracts")
         
+        for contract in contracts:
+            try:
+                # Use the improved individual price method
+                price = self.get_market_price(contract, timeout=5)
+                prices[contract.symbol] = price
+                self.logger.debug(f"Got price for {contract.symbol}: ${price:.2f}")
+            except MarketDataError as e:
+                self.logger.warning(f"No price for {contract.symbol}: {e}")
+            except Exception as e:
+                self.logger.error(f"Error getting price for {contract.symbol}: {e}")
+        
+        self.logger.info(f"Successfully retrieved {len(prices)}/{len(contracts)} prices")
         return prices 

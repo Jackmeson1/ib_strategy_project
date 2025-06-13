@@ -18,6 +18,7 @@ from src.core.types import (
 )
 from src.execution.batch_executor import BatchOrderExecutor
 from src.execution.smart_executor import SmartOrderExecutor
+from src.execution.native_batch_executor import NativeBatchExecutor
 from src.strategy.fixed_leverage import FixedLeverageStrategy
 from src.utils.logger import get_logger
 
@@ -47,13 +48,13 @@ class EnhancedFixedLeverageStrategy(FixedLeverageStrategy):
 
         # Choose execution engine based on batch_execution flag
         if batch_execution:
-            self.smart_executor = BatchOrderExecutor(
+            self.smart_executor = NativeBatchExecutor(
                 ib=self.ib,
                 portfolio_manager=self.portfolio_manager,
                 config=self.config,
                 contracts=self.contracts,
             )
-            self.logger.info("Enhanced Fixed Leverage Strategy initialized with Batch Executor")
+            self.logger.info("Enhanced Fixed Leverage Strategy initialized with Native Batch Executor")
         else:
             self.smart_executor = SmartOrderExecutor(
                 ib=self.ib,
@@ -106,8 +107,8 @@ class EnhancedFixedLeverageStrategy(FixedLeverageStrategy):
             target_positions = self.calculate_target_positions()
 
             # Execute rebalance using selected executor
-            if isinstance(self.smart_executor, BatchOrderExecutor):
-                self.logger.info("Executing rebalance with Batch Order Executor")
+            if isinstance(self.smart_executor, (BatchOrderExecutor, NativeBatchExecutor)):
+                self.logger.info("Executing rebalance with Native Batch Order Executor")
                 orders = self._calculate_orders(target_positions)
                 if self.config.dry_run:
                     self.logger.info("DRY RUN: Batch orders would be executed")

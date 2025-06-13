@@ -12,5 +12,5 @@ def convert(amount: float, from_currency: str, to_currency: str, market_data: Ma
     to_currency = to_currency.upper()
     if from_currency == to_currency:
         return amount
-    rate = market_data.get_fx_rate(from_currency=to_currency, to_currency=from_currency)
+    rate = market_data.get_fx_rate(from_currency=from_currency, to_currency=to_currency)
     return amount / rate
