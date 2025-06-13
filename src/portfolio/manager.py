@@ -51,9 +51,10 @@ class PortfolioManager:
         self._cache_timestamp: Optional[datetime] = None
         self._cache_ttl_seconds = 60  # 1 minute cache
 
-    def _to_usd(self, amount: float, currency: str) -> float:
-        """Convert the given amount to USD."""
-        return convert(amount, currency, "USD", self.market_data)
+    def _to_base_currency(self, amount: float, currency: str, account_id: str) -> float:
+        """Convert the given amount to the account's base currency."""
+        base_currency = self._currency_map.get(account_id, "USD")
+        return convert(amount, currency, base_currency, self.market_data)
     
     def _is_cache_valid(self) -> bool:
         """Check if cache is still valid."""
@@ -180,7 +181,13 @@ class PortfolioManager:
                     value = account_summary.get(field, 0.0)
                     if field not in aggregate:
                         aggregate[field] = 0.0
-                    aggregate[field] += self._to_usd(value, self._currency_map[acc.account_id])
+                    # For primary account, use direct value; for multi-account, convert to base currency of first account
+                    if len(self.accounts) == 1:
+                        aggregate[field] += value  # Single account - use native values
+                    else:
+                        # Multi-account: convert to base currency of first account
+                        base_account_currency = self._currency_map[self.accounts[0].account_id]
+                        aggregate[field] += self._to_base_currency(value, self._currency_map[acc.account_id], self.accounts[0].account_id)
 
             # Validate critical fields
             if aggregate.get('NetLiquidation', 0) <= 0:
@@ -190,12 +197,15 @@ class PortfolioManager:
             self._account_cache = aggregate
             self._cache_timestamp = datetime.now()
 
-            # Log sanitized summary
+            # Log sanitized summary with correct currency
+            base_currency = self._currency_map[self.accounts[0].account_id] if self.accounts else "USD"
+            currency_symbol = "$" if base_currency == "USD" else f"{base_currency} "
             self.logger.info(
                 "Account summary retrieved",
-                net_liquidation=f"${aggregate.get('NetLiquidation', 0):,.0f}",
-                available_funds=f"${aggregate.get('AvailableFunds', 0):,.0f}",
-                margin_used=f"${aggregate.get('MaintMarginReq', 0):,.0f}"
+                net_liquidation=f"{currency_symbol}{aggregate.get('NetLiquidation', 0):,.0f}",
+                available_funds=f"{currency_symbol}{aggregate.get('AvailableFunds', 0):,.0f}",
+                margin_used=f"{currency_symbol}{aggregate.get('MaintMarginReq', 0):,.0f}",
+                base_currency=base_currency
             )
 
             return aggregate
@@ -273,11 +283,14 @@ class PortfolioManager:
             
             current_leverage = gross_pos_usd / nlv_usd
             
+            base_currency = self._currency_map[self.accounts[0].account_id] if self.accounts else "USD"
+            currency_symbol = "$" if base_currency == "USD" else f"{base_currency} "
             self.logger.info(
                 "Current leverage calculated",
                 leverage=f"{current_leverage:.2f}",
-                gross_position_usd=f"${gross_pos_usd:,.0f}",
-                nlv_usd=f"${nlv_usd:,.0f}"
+                gross_position=f"{currency_symbol}{gross_pos_usd:,.0f}",
+                nlv=f"{currency_symbol}{nlv_usd:,.0f}",
+                base_currency=base_currency
             )
             
             return current_leverage
